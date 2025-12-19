@@ -1,0 +1,12 @@
+model Volunteer {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status               String @default("AVAILABLE")
+  notificationSettings Json?
+
+  rides Ride[]
+
+  @@map("volunteer")
+}

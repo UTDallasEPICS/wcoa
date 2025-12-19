@@ -1,5 +1,5 @@
 {
-  "name": "epics-template",
+  "name": "wcoa",
   "type": "module",
   "private": true,
   "scripts": {
@@ -8,7 +8,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "prisma:reset": "prisma migrate reset -f && prisma db seed"
+    "prisma:reset": "prisma migrate dev --name init && prisma generate && prisma migrate reset -f && prisma db seed"
   },
   "dependencies": {
     "@nuxt/ui": "^4.3.0",

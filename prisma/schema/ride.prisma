@@ -1,0 +1,28 @@
+model Ride {
+  id     String     @id @default(uuid())
+  status RideStatus @default(CREATED)
+
+  clientId    String
+  client      Client     @relation(fields: [clientId], references: [id])
+  volunteerId String?
+  volunteer   Volunteer? @relation(fields: [volunteerId], references: [id])
+
+  // --- THE SNAPSHOTS ---
+  pickupDisplay  String
+  dropoffDisplay String
+
+  // --- THE REFERENCES ---
+  pickupAddressId  String?
+  pickupAddress    Address? @relation("PickupRef", fields: [pickupAddressId], references: [id], onDelete: SetNull)
+  dropoffAddressId String?
+  dropoffAddress   Address? @relation("DropoffRef", fields: [dropoffAddressId], references: [id], onDelete: SetNull)
+
+  // Timing & Info
+  scheduledTime DateTime
+  notes         String? // Essential for Admin instructions to Volunteer
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ride")
+}

@@ -1,0 +1,12 @@
+enum Role {
+  ADMIN
+  VOLUNTEER
+  CLIENT
+}
+
+enum RideStatus {
+  CREATED
+  ASSIGNED
+  COMPLETED
+  CANCELLED
+}

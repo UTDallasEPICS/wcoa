@@ -1,0 +1,18 @@
+- user
+  - attributes
+    - fName
+    - lName
+    - email
+    - phone
+    - role
+  - subclasses
+    - admin
+    - client
+      - address
+      - rides
+    - volunteer
+      - status
+      - notificationSettings
+      - rides
+
+- ride

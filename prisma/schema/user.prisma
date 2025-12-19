@@ -1,0 +1,18 @@
+model User {
+  id            String  @id
+  name          String
+  email         String
+  emailVerified Boolean @default(false)
+  phone         String? @unique
+  role          Role    @default(CLIENT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions  Session[]
+  volunteer Volunteer?
+  client    Client?
+
+  @@unique([email])
+  @@map("user")
+}

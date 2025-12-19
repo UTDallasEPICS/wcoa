@@ -1,0 +1,29 @@
+model Client {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  homeAddressId String
+  homeAddress   Address @relation(fields: [homeAddressId], references: [id])
+
+  rides Ride[]
+
+  @@map("client")
+}
+
+model Address {
+  id     String @id @default(uuid())
+  street String
+  city   String
+  state  String
+  zip    String
+
+  clients Client[]
+
+  // Relations to track historical rides (optional)
+  ridesStarted Ride[] @relation("PickupRef")
+  ridesEnded   Ride[] @relation("DropoffRef")
+
+  @@unique([street, city, state, zip])
+  @@map("address")
+}
