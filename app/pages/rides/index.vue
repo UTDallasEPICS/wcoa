@@ -2,8 +2,12 @@
   import { h, resolveComponent } from 'vue'
   import type { TableColumn, TableRow } from '@nuxt/ui'
   import * as z from 'zod'
+  import { authClient } from '../../utils/auth-client'
 
   const UBadge = resolveComponent('UBadge')
+
+  const { data: session } = await authClient.useSession(useFetch)
+  const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
 
   const { data: rides, status, refresh: refreshRides } = await useFetch('/api/get/rides')
   const { data: clients } = await useFetch('/api/get/clients')
@@ -140,6 +144,7 @@
   <UContainer class="py-10">
     <div class="mb-6 flex items-center justify-end">
       <UButton
+        v-if="isAdmin"
         label="Create Ride"
         icon="i-lucide-plus"
         color="primary"

@@ -1,14 +1,24 @@
 <script setup lang="ts">
   import * as z from 'zod'
+  import { authClient } from '../../utils/auth-client'
 
   const route = useRoute()
   const id = route.params.id
   const toast = useToast()
 
+  const { data: session } = await authClient.useSession(useFetch)
   const { data: ride, status, refresh: refreshRide } = await useFetch(`/api/get/rides/byId/${id}`)
 
   const isEditModalOpen = ref(false)
   const isDeleteModalOpen = ref(false)
+
+  const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
+  const isVolunteer = computed(() => session.value?.user?.role === 'VOLUNTEER')
+  
+  // Volunteer specific checks
+  // Assuming we need to fetch the volunteer record ID associated with this user to match ride.volunteerId
+  // Ideally ride.volunteer.userId === session.user.id
+  const isAssignedToMe = computed(() => ride.value?.volunteer?.userId === session.value?.user?.id)
 
   const schema = z.object({
     pickupDisplay: z.string().min(1, 'Pickup address is required'),
@@ -61,6 +71,55 @@
       await navigateTo('/rides')
     } catch (err) {
       toast.add({ title: 'Error', description: 'Failed to delete ride', color: 'error' })
+    }
+  }
+
+  async function handleVolunteerAction(action: 'signup' | 'complete') {
+    // We need to know the volunteer ID for this user.
+    // However, the ride update API might expect us to just set status and maybe volunteerId.
+    // If we are signing up, we need to assign the volunteer.
+    // Since we don't have the volunteer ID in session (only userId), we might need an endpoint 
+    // that handles "assign me" using the session user ID.
+    // For now, let's assume we can update status and the backend handles assignment or we pass userId?
+    // Actually, looking at previous code, `server/api/put/rides/[id].ts` just updates `data`.
+    // We need a specific endpoint or logic to 'assign volunteer by userId'.
+    
+    // Simplification: We'll call a new endpoint or update the PUT to handle 'assignToMe' flag?
+    // Or better, let's create a specialized action handler in the component that fetches the volunteer ID first?
+    // Or we can just update the status for completion. For signup, we need to link the volunteer.
+    
+    // Let's rely on a smart backend or fetch volunteer ID.
+    // Fetching volunteer ID for current user:
+    let volunteerId = ride.value?.volunteerId
+    
+    if (action === 'signup') {
+        // We need to find our volunteer profile ID. 
+        // We can add a small API call or assume the user has one if they are role VOLUNTEER.
+        // Let's call a helper or just search?
+        // Ideally the session would have it, or we fetch it.
+        // Let's assume we can't easily get it without a call.
+        // Quick fix: Add a server endpoint `api/post/rides/[id]/signup`?
+        try {
+            await $fetch(`/api/post/rides/${id}/signup`, { method: 'POST' })
+            toast.add({ title: 'Success', description: 'You have signed up for this ride', color: 'success' })
+            await refreshRide()
+        } catch(e) {
+             toast.add({ title: 'Error', description: 'Failed to sign up', color: 'error' })
+        }
+        return
+    }
+
+    if (action === 'complete') {
+        try {
+            await $fetch(`/api/put/rides/${id}`, {
+                method: 'PUT',
+                body: { status: 'COMPLETED' }
+            })
+            toast.add({ title: 'Success', description: 'Ride marked as completed', color: 'success' })
+            await refreshRide()
+        } catch(e) {
+             toast.add({ title: 'Error', description: 'Failed to complete ride', color: 'error' })
+        }
     }
   }
 
@@ -121,6 +180,7 @@
             <div>
               <p class="text-sm text-gray-500">Client</p>
               <p class="font-medium">{{ ride.client?.user?.name }}</p>
+              <!-- Hide client email from volunteers if strictly needed, but let's keep it for contact -->
               <p class="text-sm text-gray-500">{{ ride.client?.user?.email }}</p>
             </div>
 
@@ -139,7 +199,7 @@
           </div>
 
           <template #footer>
-            <div class="flex gap-2">
+            <div class="flex gap-2" v-if="isAdmin">
               <UButton
                 label="Edit"
                 icon="i-lucide-edit"
@@ -154,6 +214,27 @@
                 variant="subtle"
                 @click="isDeleteModalOpen = true"
               />
+            </div>
+            <div class="flex gap-2" v-else-if="isVolunteer">
+                <UButton
+                    v-if="ride.status === 'CREATED'"
+                    label="Sign Up"
+                    icon="i-lucide-user-plus"
+                    color="primary"
+                    class="flex-1 justify-center"
+                    @click="handleVolunteerAction('signup')"
+                />
+                <UButton
+                    v-else-if="ride.status === 'ASSIGNED' && isAssignedToMe"
+                    label="Mark as Completed"
+                    icon="i-lucide-check"
+                    color="success"
+                    class="flex-1 justify-center"
+                    @click="handleVolunteerAction('complete')"
+                />
+                 <div v-else class="text-sm text-gray-500 text-center w-full italic">
+                    {{ ride.status === 'COMPLETED' ? 'Ride Completed' : 'Not available' }}
+                </div>
             </div>
           </template>
         </UCard>

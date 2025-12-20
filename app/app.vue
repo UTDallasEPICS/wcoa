@@ -6,40 +6,46 @@
   const { data: session } = await authClient.useSession(useFetch)
 
   const items = computed<NavigationMenuItem[]>(() => {
-    const baseItems: NavigationMenuItem[] = [
-      {
-        label: 'Dashboard',
-        to: '/',
-        icon: 'i-lucide-layout-dashboard',
-      },
-      {
-        label: 'Rides',
-        to: '/rides',
-        icon: 'i-lucide-car',
-      },
-      {
-        label: 'People',
-        to: '/people',
-        icon: 'i-lucide-users',
-      },
-    ]
+    const role = session.value?.user?.role
 
-    if (session.value?.user?.role === 'ADMIN') {
-      baseItems.push({
-        label: 'Admins',
-        to: '/admin',
-        icon: 'i-lucide-shield-check',
-      })
+    if (role === 'VOLUNTEER') {
+      return [
+        {
+          label: 'Rides',
+          to: '/rides',
+          icon: 'i-lucide-car',
+        },
+      ]
     }
 
-    return baseItems
+    if (role === 'ADMIN') {
+      return [
+        {
+          label: 'Dashboard',
+          to: '/',
+          icon: 'i-lucide-layout-dashboard',
+        },
+        {
+          label: 'Rides',
+          to: '/rides',
+          icon: 'i-lucide-car',
+        },
+        {
+          label: 'People',
+          to: '/people',
+          icon: 'i-lucide-users',
+        },
+      ]
+    }
+
+    return []
   })
 
   async function handleLogout() {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          navigateTo('/auth')
+          window.location.href = '/auth'
         },
       },
     })

@@ -45,12 +45,15 @@
         otp: state.otp.join(''),
       })
 
-      const user = await $fetch(`/api/get/users/byEmail/${data.user.email}`)
-
       if (error) {
         toast.add({ title: 'Error', description: error.message, color: 'error' })
       } else {
-        await navigateTo('/', { external: true })
+        const role = data.user.role
+        if (role === 'VOLUNTEER') {
+          await navigateTo('/rides', { external: true })
+        } else {
+          await navigateTo('/', { external: true })
+        }
       }
     }
   }
@@ -78,9 +81,20 @@
           />
         </UFormField>
 
-        <UButton loading-auto type="submit" class="w-full justify-center">
-          {{ isEmailSent ? 'Login' : 'Send OTP' }}
-        </UButton>
+        <div class="flex gap-2">
+          <UButton
+            v-if="isEmailSent"
+            color="neutral"
+            variant="ghost"
+            class="flex-1 justify-center"
+            @click="isEmailSent = false"
+          >
+            Back
+          </UButton>
+          <UButton loading-auto type="submit" class="flex-1 justify-center">
+            {{ isEmailSent ? 'Login' : 'Send OTP' }}
+          </UButton>
+        </div>
       </UForm>
     </UCard>
   </div>

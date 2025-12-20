@@ -2,14 +2,18 @@
   import { h, resolveComponent } from 'vue'
   import type { TableColumn, TableRow } from '@nuxt/ui'
   import * as z from 'zod'
+  import { authClient } from '../utils/auth-client'
 
   const toast = useToast()
   const UButton = resolveComponent('UButton')
   const UBadge = resolveComponent('UBadge')
 
+  const { data: session } = await authClient.useSession(useFetch)
+
   // --- Data Fetching ---
   const { data: volunteers, refresh: refreshVolunteers } = await useFetch('/api/get/volunteers')
   const { data: clients, refresh: refreshClients } = await useFetch('/api/get/clients')
+  const { data: admins, refresh: refreshAdmins } = await useFetch('/api/get/admins')
 
   // --- State ---
   const activeTab = ref('volunteers')
@@ -36,12 +40,19 @@
     zip: z.string().min(1, 'Zip is required'),
   })
 
+  const adminSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.string().email('Invalid email'),
+    phone: z.string().optional(),
+  })
+
   // --- Modals State ---
   const isVolunteerModalOpen = ref(false)
   const isClientModalOpen = ref(false)
+  const isAdminModalOpen = ref(false)
   const isDeleteModalOpen = ref(false)
   const editingId = ref<string | null>(null)
-  const deleteTarget = ref<{ type: 'volunteer' | 'client'; id: string } | null>(null)
+  const deleteTarget = ref<{ type: 'volunteer' | 'client' | 'admin'; id: string } | null>(null)
 
   const volunteerState = reactive({
     name: '',
@@ -58,6 +69,12 @@
     city: '',
     state: '',
     zip: '',
+  })
+
+  const adminState = reactive({
+    name: '',
+    email: '',
+    phone: '',
   })
 
   // --- Computed ---
@@ -90,6 +107,14 @@
     )
   })
 
+  const filteredAdmins = computed(() => {
+    if (!admins.value) return []
+    const q = search.value.toLowerCase()
+    return admins.value.filter(
+      (a: any) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+    )
+  })
+
   const items = [
     {
       label: 'Volunteers',
@@ -100,6 +125,11 @@
       label: 'Clients',
       slot: 'clients',
       value: 'clients',
+    },
+    {
+      label: 'Admins',
+      slot: 'admins',
+      value: 'admins',
     },
   ]
 
@@ -121,8 +151,9 @@
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) =>
-        h('div', { class: 'flex justify-end gap-2' }, [
+      cell: ({ row }) => {
+        const isSelf = row.original.userId === session.value?.user?.id
+        const actions = [
           h(UButton, {
             icon: 'i-lucide-edit',
             color: 'neutral',
@@ -130,14 +161,20 @@
             size: 'xs',
             onClick: () => openEditVolunteer(row.original),
           }),
-          h(UButton, {
-            icon: 'i-lucide-trash',
-            color: 'error',
-            variant: 'ghost',
-            size: 'xs',
-            onClick: () => confirmDelete('volunteer', row.original.id),
-          }),
-        ]),
+        ]
+        if (!isSelf) {
+          actions.push(
+            h(UButton, {
+              icon: 'i-lucide-trash',
+              color: 'error',
+              variant: 'ghost',
+              size: 'xs',
+              onClick: () => confirmDelete('volunteer', row.original.id),
+            })
+          )
+        }
+        return h('div', { class: 'flex justify-end gap-2' }, actions)
+      },
     },
   ]
 
@@ -156,8 +193,9 @@
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) =>
-        h('div', { class: 'flex justify-end gap-2' }, [
+      cell: ({ row }) => {
+        const isSelf = row.original.userId === session.value?.user?.id
+        const actions = [
           h(UButton, {
             icon: 'i-lucide-edit',
             color: 'neutral',
@@ -165,14 +203,55 @@
             size: 'xs',
             onClick: () => openEditClient(row.original),
           }),
+        ]
+        if (!isSelf) {
+          actions.push(
+            h(UButton, {
+              icon: 'i-lucide-trash',
+              color: 'error',
+              variant: 'ghost',
+              size: 'xs',
+              onClick: () => confirmDelete('client', row.original.id),
+            })
+          )
+        }
+        return h('div', { class: 'flex justify-end gap-2' }, actions)
+      },
+    },
+  ]
+
+  const adminColumns: TableColumn<any>[] = [
+    { accessorKey: 'name', header: 'Name' },
+    { accessorKey: 'email', header: 'Email' },
+    { accessorKey: 'phone', header: 'Phone' },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => {
+        // Prevent deleting self
+        const isSelf = row.original.id === session.value?.user?.id
+        const actions = [
           h(UButton, {
-            icon: 'i-lucide-trash',
-            color: 'error',
+            icon: 'i-lucide-edit',
+            color: 'neutral',
             variant: 'ghost',
             size: 'xs',
-            onClick: () => confirmDelete('client', row.original.id),
+            onClick: () => openEditAdmin(row.original),
           }),
-        ]),
+        ]
+        if (!isSelf) {
+          actions.push(
+            h(UButton, {
+              icon: 'i-lucide-trash',
+              color: 'error',
+              variant: 'ghost',
+              size: 'xs',
+              onClick: () => confirmDelete('admin', row.original.id),
+            })
+          )
+        }
+        return h('div', { class: 'flex justify-end gap-2' }, actions)
+      },
     },
   ]
 
@@ -269,8 +348,45 @@
     }
   }
 
+  // Admin
+  function openCreateAdmin() {
+    editingId.value = null
+    Object.assign(adminState, { name: '', email: '', phone: '' })
+    isAdminModalOpen.value = true
+  }
+
+  function openEditAdmin(admin: any) {
+    editingId.value = admin.id
+    Object.assign(adminState, {
+      name: admin.name,
+      email: admin.email,
+      phone: admin.phone || '',
+    })
+    isAdminModalOpen.value = true
+  }
+
+  async function handleAdminSubmit() {
+    try {
+      if (editingId.value) {
+        await $fetch(`/api/put/admins/${editingId.value}`, { method: 'PUT', body: adminState })
+        toast.add({ title: 'Success', description: 'Admin updated', color: 'success' })
+      } else {
+        await $fetch('/api/post/admins', { method: 'POST', body: adminState })
+        toast.add({ title: 'Success', description: 'Admin created', color: 'success' })
+      }
+      isAdminModalOpen.value = false
+      refreshAdmins()
+    } catch (err: any) {
+      toast.add({
+        title: 'Error',
+        description: err.statusMessage || 'Action failed',
+        color: 'error',
+      })
+    }
+  }
+
   // Delete
-  function confirmDelete(type: 'volunteer' | 'client', id: string) {
+  function confirmDelete(type: 'volunteer' | 'client' | 'admin', id: string) {
     deleteTarget.value = { type, id }
     isDeleteModalOpen.value = true
   }
@@ -282,15 +398,29 @@
       await $fetch(`/api/delete/${type}s/${id}`, { method: 'DELETE' })
       toast.add({
         title: 'Success',
-        description: `${type === 'volunteer' ? 'Volunteer' : 'Client'} deleted`,
+        description: `${type.charAt(0).toUpperCase() + type.slice(1)} deleted`,
         color: 'success',
       })
       if (type === 'volunteer') refreshVolunteers()
-      else refreshClients()
+      else if (type === 'client') refreshClients()
+      else refreshAdmins()
     } catch (err: any) {
       toast.add({ title: 'Error', description: 'Delete failed', color: 'error' })
     }
     isDeleteModalOpen.value = false
+  }
+
+  function getButtonLabel() {
+    if (activeTab.value === 'volunteers') return 'Add Volunteer'
+    if (activeTab.value === 'clients') return 'Add Client'
+    if (activeTab.value === 'admins') return 'Add Admin'
+    return 'Add'
+  }
+
+  function handleAddClick() {
+    if (activeTab.value === 'volunteers') openCreateVolunteer()
+    else if (activeTab.value === 'clients') openCreateClient()
+    else if (activeTab.value === 'admins') openCreateAdmin()
   }
 </script>
 
@@ -298,10 +428,10 @@
   <UContainer class="py-10">
     <div class="mb-6 flex items-center justify-end">
       <UButton
-        :label="activeTab === 'volunteers' ? 'Add Volunteer' : 'Add Client'"
+        :label="getButtonLabel()"
         icon="i-lucide-plus"
         color="primary"
-        @click="activeTab === 'volunteers' ? openCreateVolunteer() : openCreateClient()"
+        @click="handleAddClick()"
       />
     </div>
 
@@ -327,6 +457,9 @@
       </template>
       <template #clients>
         <UTable :data="filteredClients" :columns="clientColumns" class="mt-4" />
+      </template>
+      <template #admins>
+        <UTable :data="filteredAdmins" :columns="adminColumns" class="mt-4" />
       </template>
     </UTabs>
 
@@ -409,6 +542,37 @@
               color="neutral"
               variant="ghost"
               @click="isClientModalOpen = false"
+            />
+            <UButton type="submit" label="Save" color="primary" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+
+    <!-- Admin Modal -->
+    <UModal v-model:open="isAdminModalOpen" :title="editingId ? 'Edit Admin' : 'Add Admin'">
+      <template #content>
+        <UForm
+          :schema="adminSchema"
+          :state="adminState"
+          class="space-y-4 p-4"
+          @submit="handleAdminSubmit"
+        >
+          <UFormField label="Name" name="name"
+            ><UInput v-model="adminState.name" class="w-full"
+          /></UFormField>
+          <UFormField label="Email" name="email"
+            ><UInput v-model="adminState.email" class="w-full"
+          /></UFormField>
+          <UFormField label="Phone" name="phone"
+            ><UInput v-model="adminState.phone" class="w-full"
+          /></UFormField>
+          <div class="flex justify-end gap-2 pt-4">
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              @click="isAdminModalOpen = false"
             />
             <UButton type="submit" label="Save" color="primary" />
           </div>
