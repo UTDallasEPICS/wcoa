@@ -86,6 +86,22 @@ async function main() {
     include: { volunteer: true },
   })
 
+  await prisma.user.create({
+    data: {
+      name: 'TW-NPTS',
+      email: 'tushar.wani@npts.com',
+      role: 'VOLUNTEER',
+      emailVerified: true,
+      volunteer: {
+        create: {
+          status: 'AVAILABLE',
+          notificationSettings: { push: true, email: false },
+        },
+      },
+    },
+    include: { volunteer: true },
+  })
+
   console.log('--- Seeding Rides ---')
 
   // Ride 1: Upcoming Ride (Future)
