@@ -9,7 +9,11 @@
   const { data: clients } = await useFetch('/api/get/clients')
 
   const search = ref('')
+  const statusFilter = ref('All')
+  const dateFilter = ref('')
   const isCreateModalOpen = ref(false)
+
+  const statusOptions = ['All', 'CREATED', 'ASSIGNED', 'COMPLETED', 'CANCELLED']
 
   const schema = z.object({
     clientId: z.string().min(1, 'Client is required'),
@@ -29,27 +33,39 @@
 
   const filteredRides = computed(() => {
     if (!rides.value) return []
-    if (!search.value) return rides.value
+    
+    let result = rides.value
 
-    const q = search.value.toLowerCase()
-    return rides.value.filter((ride: any) => {
-      return (
-        ride.id.toLowerCase().includes(q) ||
-        ride.client?.user?.name?.toLowerCase().includes(q) ||
-        ride.pickupDisplay?.toLowerCase().includes(q) ||
-        ride.dropoffDisplay?.toLowerCase().includes(q)
-      )
-    })
+    // Status Filter
+    if (statusFilter.value !== 'All') {
+      result = result.filter((ride: any) => ride.status === statusFilter.value)
+    }
+
+    // Date Filter
+    if (dateFilter.value) {
+      result = result.filter((ride: any) => {
+        const rideDate = new Date(ride.scheduledTime).toISOString().split('T')[0]
+        return rideDate === dateFilter.value
+      })
+    }
+
+    // Search Filter
+    if (search.value) {
+      const q = search.value.toLowerCase()
+      result = result.filter((ride: any) => {
+        return (
+          ride.id.toLowerCase().includes(q) ||
+          ride.client?.user?.name?.toLowerCase().includes(q) ||
+          ride.pickupDisplay?.toLowerCase().includes(q) ||
+          ride.dropoffDisplay?.toLowerCase().includes(q)
+        )
+      })
+    }
+
+    return result
   })
 
   const columns: TableColumn<any>[] = [
-    {
-      accessorKey: 'id',
-      header: 'ID',
-      cell: ({ row }) => {
-        return h('span', { class: 'font-mono text-xs' }, row.original.id.slice(0, 8))
-      },
-    },
     {
       accessorKey: 'status',
       header: 'Status',
@@ -122,7 +138,7 @@
 
 <template>
   <UContainer class="py-10">
-    <div class="flex justify-between items-center mb-6">
+    <div class="mb-6 flex items-center justify-between">
       <h1 class="text-2xl font-bold">Rides</h1>
       <UButton
         label="Create Ride"
@@ -132,13 +148,15 @@
       />
     </div>
 
-    <div class="mb-4">
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row">
       <UInput
         v-model="search"
         icon="i-lucide-search"
-        placeholder="Search rides by client, ID, or location..."
-        class="max-w-md"
+        placeholder="Search rides..."
+        class="flex-1"
       />
+      <USelect v-model="statusFilter" :items="statusOptions" placeholder="Status" class="w-full sm:w-40" />
+      <UInput v-model="dateFilter" type="date" class="w-full sm:w-auto" />
     </div>
 
     <UTable
