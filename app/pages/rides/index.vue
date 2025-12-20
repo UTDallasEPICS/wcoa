@@ -33,7 +33,7 @@
 
   const filteredRides = computed(() => {
     if (!rides.value) return []
-    
+
     let result = rides.value
 
     // Status Filter
@@ -138,8 +138,7 @@
 
 <template>
   <UContainer class="py-10">
-    <div class="mb-6 flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Rides</h1>
+    <div class="mb-6 flex items-center justify-end">
       <UButton
         label="Create Ride"
         icon="i-lucide-plus"
@@ -155,7 +154,12 @@
         placeholder="Search rides..."
         class="flex-1"
       />
-      <USelect v-model="statusFilter" :items="statusOptions" placeholder="Status" class="w-full sm:w-40" />
+      <USelect
+        v-model="statusFilter"
+        :items="statusOptions"
+        placeholder="Status"
+        class="w-full sm:w-40"
+      />
       <UInput v-model="dateFilter" type="date" class="w-full sm:w-auto" />
     </div>
 

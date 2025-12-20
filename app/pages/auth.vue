@@ -50,11 +50,7 @@
       if (error) {
         toast.add({ title: 'Error', description: error.message, color: 'error' })
       } else {
-        if (user.role === 'ADMIN') {
-          await navigateTo('/admin/', { external: true })
-        } else {
-          await navigateTo('/', { external: true })
-        }
+        await navigateTo('/', { external: true })
       }
     }
   }

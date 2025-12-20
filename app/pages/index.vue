@@ -4,10 +4,9 @@
 </script>
 
 <template>
-  <div v-if="pending">Loading users...</div>
-  <div v-else-if="error">{{ error.message }}</div>
-  <div v-else class="overflow-auto">
-    <h1>Users in the database:</h1>
-    <pre>{{ JSON.stringify(users, null, 2) }}</pre>
-  </div>
+  <UContainer class="py-20">
+    <div class="flex flex-col items-center justify-center space-y-4">
+      <p class="text-xl text-gray-500">Dashboard Coming Soon</p>
+    </div>
+  </UContainer>
 </template>

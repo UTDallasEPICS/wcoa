@@ -134,7 +134,7 @@
 
             <div v-if="ride.notes">
               <p class="text-sm text-gray-500">Notes</p>
-              <p class="rounded border bg-gray-50 p-3 text-sm">{{ ride.notes }}</p>
+              <p class="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200">{{ ride.notes }}</p>
             </div>
           </div>
 
