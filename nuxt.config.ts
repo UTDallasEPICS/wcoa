@@ -3,4 +3,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxt/ui'],
   css: ['./assets/css/main.css'],
+  runtimeConfig: {
+    public: {
+      googleMapsApiKey: '', // Overridden by NUXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    },
+  },
 })
