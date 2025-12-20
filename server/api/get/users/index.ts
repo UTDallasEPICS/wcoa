@@ -1,3 +1,5 @@
+import { prisma } from '../../../utils/prisma'
+
 export default defineEventHandler((event) => {
-  return event.context.prisma.user.findMany()
+  return prisma.user.findMany()
 })

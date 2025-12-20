@@ -45,10 +45,16 @@
         otp: state.otp.join(''),
       })
 
+      const user = await $fetch(`/api/get/users/byEmail/${data.user.email}`)
+
       if (error) {
         toast.add({ title: 'Error', description: error.message, color: 'error' })
       } else {
-        await navigateTo('/', { external: true })
+        if (user.role === 'ADMIN') {
+          await navigateTo('/admin/', { external: true })
+        } else {
+          await navigateTo('/', { external: true })
+        }
       }
     }
   }

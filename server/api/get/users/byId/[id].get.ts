@@ -1,9 +1,9 @@
 import { prisma } from '../../../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
-  const email = getRouterParam(event, 'email')
+  const id = getRouterParam(event, 'id')
 
-  if (!email) {
+  if (!id) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Email is required',
@@ -12,10 +12,9 @@ export default defineEventHandler(async (event) => {
 
   const user = await prisma.user.findUnique({
     where: {
-      email,
+      id,
     },
   })
 
   return user
 })
-

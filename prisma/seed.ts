@@ -46,7 +46,6 @@ async function main() {
   // 1. Admin
   await prisma.user.create({
     data: {
-      id: 'admin_01',
       name: 'Tushar Wani',
       email: 'reachtusharwani@gmail.com',
       role: 'ADMIN',
@@ -57,7 +56,6 @@ async function main() {
   // 2. Client
   const clientUser = await prisma.user.create({
     data: {
-      id: 'client_01',
       name: 'Martha Jenkins',
       email: 'martha@example.com',
       role: 'CLIENT',
@@ -74,7 +72,6 @@ async function main() {
   // 3. Volunteer
   const volunteerUser = await prisma.user.create({
     data: {
-      id: 'volunteer_01',
       name: 'Bob Tester',
       email: 'bob@example.com',
       role: 'VOLUNTEER',
