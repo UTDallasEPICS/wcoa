@@ -17,6 +17,7 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'sqlite',
   }),
+  trustedOrigins: ['http://localhost:3000', 'http://192.168.4.240:3000'],
   user: {
     additionalFields: {
       role: {

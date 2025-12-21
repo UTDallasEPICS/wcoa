@@ -42,13 +42,11 @@
   })
 
   async function handleLogout() {
-    await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          window.location.href = '/auth'
-        },
-      },
-    })
+    try {
+      await authClient.signOut()
+    } finally {
+      window.location.href = '/auth'
+    }
   }
 
   const userMenuItems = [
@@ -88,6 +86,16 @@
 
       <template #body>
         <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
+        <div class="mt-4 border-t border-gray-200 dark:border-gray-800 pt-4">
+          <UButton
+            label="Logout"
+            icon="i-lucide-log-out"
+            color="neutral"
+            variant="ghost"
+            block
+            @click="handleLogout"
+          />
+        </div>
       </template>
     </UHeader>
 
