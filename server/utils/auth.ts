@@ -4,6 +4,7 @@ import { prisma } from './prisma'
 import { emailOTP } from 'better-auth/plugins/email-otp'
 import nodemailer from 'nodemailer'
 import { createAuthMiddleware, APIError } from 'better-auth/api'
+import { sendEmail } from './email'
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -28,12 +29,7 @@ export const auth = betterAuth({
   plugins: [
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: email,
-          subject: 'OTP',
-          html: `${otp}`,
-        })
+        sendEmail(email, 'OTP', `${otp}`)
       },
     }),
   ],
