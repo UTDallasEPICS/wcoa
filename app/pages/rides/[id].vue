@@ -8,6 +8,7 @@
 
   const { data: session } = await authClient.useSession(useFetch)
   const { data: ride, status, refresh: refreshRide } = await useFetch(`/api/get/rides/byId/${id}`)
+  const { data: estimate } = await useFetch(`/api/get/rides/estimate/${id}`)
 
   const isEditModalOpen = ref(false)
   const isDeleteModalOpen = ref(false)
@@ -270,6 +271,17 @@
               <div>
                 <p class="text-sm text-gray-500">Dropoff</p>
                 <p class="font-medium">{{ ride.dropoffDisplay }}</p>
+              </div>
+            </div>
+
+            <div v-if="estimate && !estimate.error" class="flex gap-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+              <div>
+                <p class="text-sm text-gray-500">Est. Duration</p>
+                <p class="font-medium">{{ estimate.duration }}</p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500">Distance</p>
+                <p class="font-medium">{{ estimate.distance }}</p>
               </div>
             </div>
 
