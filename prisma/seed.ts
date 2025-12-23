@@ -53,6 +53,15 @@ async function main() {
     },
   })
 
+  await prisma.user.create({
+    data: {
+      name: 'UTD_Tushar Wani',
+      email: 'tmw220003@utdallas.edu',
+      role: 'ADMIN',
+      emailVerified: true,
+    },
+  })
+
   // 2. Client
   const clientUser = await prisma.user.create({
     data: {
