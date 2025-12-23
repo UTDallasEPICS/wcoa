@@ -1,4 +1,5 @@
 import { prisma } from '../../../utils/prisma'
+import { sendEmail } from '../../../utils/email'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -52,7 +53,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return await prisma.volunteer.create({
+  const volunteer = await prisma.volunteer.create({
     data: {
       userId: user.id,
       status: body.status || 'AVAILABLE'
@@ -61,4 +62,19 @@ export default defineEventHandler(async (event) => {
       user: true
     }
   })
+
+  // Send welcome email
+  if (volunteer.user.email) {
+    sendEmail(
+      volunteer.user.email,
+      'Welcome to WCOA Volunteer Program',
+      `
+        <h1>Welcome, ${volunteer.user.name}!</h1>
+        <p>Thank you for signing up as a volunteer.</p>
+        <p>You can now log in and browse available rides.</p>
+      `
+    ).catch(console.error)
+  }
+
+  return volunteer
 })

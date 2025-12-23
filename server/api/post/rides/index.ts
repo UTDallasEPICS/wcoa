@@ -1,4 +1,5 @@
 import { prisma } from '../../../utils/prisma'
+import { sendEmail } from '../../../utils/email'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -37,7 +38,7 @@ export default defineEventHandler(async (event) => {
   const pickupDisplay = `${body.pickup.street}, ${body.pickup.city}, ${body.pickup.state} ${body.pickup.zip}`
   const dropoffDisplay = `${body.dropoff.street}, ${body.dropoff.city}, ${body.dropoff.state} ${body.dropoff.zip}`
 
-  return await prisma.ride.create({
+  const ride = await prisma.ride.create({
     data: {
       clientId: body.clientId,
       pickupDisplay,
@@ -49,4 +50,32 @@ export default defineEventHandler(async (event) => {
       status: 'CREATED',
     },
   })
+
+  // Notify all volunteers
+  const volunteers = await prisma.volunteer.findMany({
+    include: { user: true },
+    where: { status: 'AVAILABLE' } // Optional: only notify available volunteers
+  })
+
+  const emailPromises = volunteers.map(volunteer => {
+    if (volunteer.user.email) {
+      return sendEmail(
+        volunteer.user.email,
+        'New Ride Available',
+        `
+          <h1>New Ride Available</h1>
+          <p>A new ride has been posted.</p>
+          <p><strong>From:</strong> ${pickupDisplay}</p>
+          <p><strong>To:</strong> ${dropoffDisplay}</p>
+          <p><strong>Time:</strong> ${new Date(body.scheduledTime).toLocaleString()}</p>
+          <p>Login to the dashboard to sign up.</p>
+        `
+      )
+    }
+  })
+
+  // We don't await this to keep the response fast, or we can use Promise.allSettled
+  Promise.allSettled(emailPromises).catch(console.error)
+
+  return ride
 })
