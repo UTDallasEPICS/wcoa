@@ -4,8 +4,11 @@
     - a new volunteer is created
         - send to created volunteer
     - when a volunteer signs up for a ride
-        - sent to admins
+        - sent to all admins
         - sent to volunteer who signed up
+    - when a volunteer un sign ups for a ride
+        - send to all admins
+        - send to volunteers who un signed up
     - when a volunteer completed a ride
         - sent to admins
         - sent to volunteer who completed the ride

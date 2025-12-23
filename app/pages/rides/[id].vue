@@ -98,7 +98,7 @@
     }
   }
 
-  async function handleVolunteerAction(action: 'signup' | 'complete') {
+  async function handleVolunteerAction(action: 'signup' | 'unsignup' | 'complete') {
     if (action === 'signup') {
       try {
         await $fetch(`/api/post/rides/${id}/signup`, { method: 'POST' })
@@ -110,6 +110,21 @@
         await refreshRide()
       } catch (e) {
         toast.add({ title: 'Error', description: 'Failed to sign up', color: 'error' })
+      }
+      return
+    }
+
+    if (action === 'unsignup') {
+      try {
+        await $fetch(`/api/post/rides/${id}/unsignup`, { method: 'POST' })
+        toast.add({
+          title: 'Success',
+          description: 'You have unsigned from this ride',
+          color: 'success',
+        })
+        await refreshRide()
+      } catch (e) {
+        toast.add({ title: 'Error', description: 'Failed to unsign up', color: 'error' })
       }
       return
     }
@@ -232,6 +247,15 @@
               />
               <UButton
                 v-if="isVolunteer && isAssignedToMe && ride.status === 'ASSIGNED'"
+                label="Unsign Up"
+                icon="i-lucide-user-minus"
+                color="warning"
+                variant="subtle"
+                class="flex-1 justify-center"
+                @click="handleVolunteerAction('unsignup')"
+              />
+              <UButton
+                v-if="isVolunteer && isAssignedToMe && ride.status === 'ASSIGNED'"
                 label="Mark as Completed"
                 icon="i-lucide-check"
                 color="success"
@@ -320,7 +344,7 @@
             <UTextarea v-model="editState.notes" class="w-full" :disabled="!isAdmin" />
           </UFormField>
 
-          <UFormField label="Total Ride Time (Hours)" name="totalRideTime" v-if="ride.status === 'COMPLETED' || isAdmin">
+          <UFormField label="Total Ride Time (Hours)" name="totalRideTime" v-if="ride?.status === 'COMPLETED' || isAdmin">
             <UInput v-model.number="editState.totalRideTime" type="number" step="0.1" class="w-full" />
           </UFormField>
 
