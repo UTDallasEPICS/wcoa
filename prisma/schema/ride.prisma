@@ -19,6 +19,7 @@ model Ride {
 
   // Timing & Info
   scheduledTime DateTime
+  totalRideTime Float?   // Actual duration in hours (e.g. 1.5)
   notes         String? // Essential for Admin instructions to Volunteer
 
   createdAt DateTime @default(now())

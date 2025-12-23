@@ -18,9 +18,13 @@
   const ridersStart = ref((route.query.ridersStart as string) || startOfYear)
   const ridersEnd = ref((route.query.ridersEnd as string) || endOfYear)
 
+  // Total Hours: Default Year to Date
+  const hoursStart = ref((route.query.hoursStart as string) || startOfYear)
+  const hoursEnd = ref((route.query.hoursEnd as string) || endOfYear)
+
   // --- URL Sync ---
   watch(
-    [completionStart, completionEnd, ridersStart, ridersEnd],
+    [completionStart, completionEnd, ridersStart, ridersEnd, hoursStart, hoursEnd],
     () => {
       router.push({
         query: {
@@ -29,6 +33,8 @@
           completionEnd: completionEnd.value || undefined,
           ridersStart: ridersStart.value || undefined,
           ridersEnd: ridersEnd.value || undefined,
+          hoursStart: hoursStart.value || undefined,
+          hoursEnd: hoursEnd.value || undefined,
         },
       })
     },
@@ -45,6 +51,13 @@
       },
     }
   )
+
+  const { data: hoursData, status: hoursStatus } = await useFetch('/api/get/metrics/hours', {
+    params: {
+      startDate: hoursStart,
+      endDate: hoursEnd,
+    },
+  })
 
   const { data: topRiders, status: ridersStatus } = await useFetch('/api/get/metrics/topRiders', {
     params: {
@@ -65,7 +78,7 @@
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
     </div>
 
-    <div class="grid grid-cols-1 gap-8 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
       <!-- Ride Completion Metric -->
       <DashboardMetricCard
         title="Ride Completion Rate"
@@ -96,6 +109,23 @@
               Total
             </div>
           </div>
+        </div>
+      </DashboardMetricCard>
+
+      <!-- Total Hours Ridden -->
+      <DashboardMetricCard
+        title="Total Hours Ridden"
+        icon="i-lucide-clock"
+        icon-class="text-info"
+        v-model:start-date="hoursStart"
+        v-model:end-date="hoursEnd"
+        :loading="hoursStatus === 'pending'"
+      >
+        <div class="flex h-full flex-col items-center justify-center space-y-2 py-6 text-center">
+          <div class="text-primary text-5xl font-extrabold">
+            {{ hoursData?.totalHours || 0 }}
+          </div>
+          <div class="text-sm text-gray-500">Hours</div>
         </div>
       </DashboardMetricCard>
 

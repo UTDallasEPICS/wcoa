@@ -11,14 +11,13 @@
   const { data: estimate } = await useFetch(`/api/get/rides/estimate/${id}`)
 
   const isEditModalOpen = ref(false)
+  const isCompleteModalOpen = ref(false)
   const isDeleteModalOpen = ref(false)
 
   const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
   const isVolunteer = computed(() => session.value?.user?.role === 'VOLUNTEER')
 
   // Volunteer specific checks
-  // Assuming we need to fetch the volunteer record ID associated with this user to match ride.volunteerId
-  // Ideally ride.volunteer.userId === session.user.id
   const isAssignedToMe = computed(() => ride.value?.volunteer?.userId === session.value?.user?.id)
 
   const schema = z.object({
@@ -26,6 +25,7 @@
     dropoffDisplay: z.string().min(1, 'Dropoff address is required'),
     scheduledTime: z.string().min(1, 'Scheduled time is required'),
     notes: z.string().optional(),
+    totalRideTime: z.number().optional(),
   })
 
   const editState = reactive({
@@ -33,6 +33,11 @@
     dropoffDisplay: '',
     scheduledTime: '',
     notes: '',
+    totalRideTime: 0,
+  })
+
+  const completeState = reactive({
+    totalRideTime: 1.0,
   })
 
   // Initialize edit state when ride is loaded or modal opens
@@ -46,6 +51,7 @@
         .toISOString()
         .slice(0, 16)
       editState.notes = ride.value.notes || ''
+      editState.totalRideTime = ride.value.totalRideTime || 0
     }
   })
 
@@ -63,6 +69,23 @@
     }
   }
 
+  async function handleComplete(event: any) {
+    try {
+      await $fetch(`/api/put/rides/${id}`, {
+        method: 'PUT',
+        body: { 
+          status: 'COMPLETED',
+          totalRideTime: event.data.totalRideTime
+        },
+      })
+      toast.add({ title: 'Success', description: 'Ride marked as completed', color: 'success' })
+      isCompleteModalOpen.value = false
+      await refreshRide()
+    } catch (err) {
+      toast.add({ title: 'Error', description: 'Failed to complete ride', color: 'error' })
+    }
+  }
+
   async function handleDelete() {
     try {
       await $fetch(`/api/delete/rides/${id}`, {
@@ -76,30 +99,7 @@
   }
 
   async function handleVolunteerAction(action: 'signup' | 'complete') {
-    // We need to know the volunteer ID for this user.
-    // However, the ride update API might expect us to just set status and maybe volunteerId.
-    // If we are signing up, we need to assign the volunteer.
-    // Since we don't have the volunteer ID in session (only userId), we might need an endpoint
-    // that handles "assign me" using the session user ID.
-    // For now, let's assume we can update status and the backend handles assignment or we pass userId?
-    // Actually, looking at previous code, `server/api/put/rides/[id].ts` just updates `data`.
-    // We need a specific endpoint or logic to 'assign volunteer by userId'.
-
-    // Simplification: We'll call a new endpoint or update the PUT to handle 'assignToMe' flag?
-    // Or better, let's create a specialized action handler in the component that fetches the volunteer ID first?
-    // Or we can just update the status for completion. For signup, we need to link the volunteer.
-
-    // Let's rely on a smart backend or fetch volunteer ID.
-    // Fetching volunteer ID for current user:
-    let volunteerId = ride.value?.volunteerId
-
     if (action === 'signup') {
-      // We need to find our volunteer profile ID.
-      // We can add a small API call or assume the user has one if they are role VOLUNTEER.
-      // Let's call a helper or just search?
-      // Ideally the session would have it, or we fetch it.
-      // Let's assume we can't easily get it without a call.
-      // Quick fix: Add a server endpoint `api/post/rides/[id]/signup`?
       try {
         await $fetch(`/api/post/rides/${id}/signup`, { method: 'POST' })
         toast.add({
@@ -115,16 +115,7 @@
     }
 
     if (action === 'complete') {
-      try {
-        await $fetch(`/api/put/rides/${id}`, {
-          method: 'PUT',
-          body: { status: 'COMPLETED' },
-        })
-        toast.add({ title: 'Success', description: 'Ride marked as completed', color: 'success' })
-        await refreshRide()
-      } catch (e) {
-        toast.add({ title: 'Error', description: 'Failed to complete ride', color: 'error' })
-      }
+      isCompleteModalOpen.value = true
     }
   }
 
@@ -198,6 +189,11 @@
               <p class="text-sm text-gray-500">{{ ride.volunteer?.user?.phone }}</p>
             </div>
 
+            <div v-if="ride.status === 'COMPLETED' || ride.totalRideTime">
+              <p class="text-sm text-gray-500">Total Ride Time</p>
+              <p class="font-medium">{{ ride.totalRideTime || 0 }} hours</p>
+            </div>
+
             <div v-if="ride.notes">
               <p class="text-sm text-gray-500">Notes</p>
               <p
@@ -209,8 +205,9 @@
           </div>
 
           <template #footer>
-            <div class="flex gap-2" v-if="isAdmin">
+            <div class="flex gap-2">
               <UButton
+                v-if="isAdmin || (isVolunteer && isAssignedToMe && ride.status === 'COMPLETED')"
                 label="Edit"
                 icon="i-lucide-edit"
                 variant="subtle"
@@ -218,16 +215,15 @@
                 @click="isEditModalOpen = true"
               />
               <UButton
+                v-if="isAdmin"
                 label="Delete"
                 icon="i-lucide-trash"
                 color="error"
                 variant="subtle"
                 @click="isDeleteModalOpen = true"
               />
-            </div>
-            <div class="flex gap-2" v-else-if="isVolunteer">
               <UButton
-                v-if="ride.status === 'CREATED'"
+                v-if="isVolunteer && !isAssignedToMe && ride.status === 'CREATED'"
                 label="Sign Up"
                 icon="i-lucide-user-plus"
                 color="primary"
@@ -235,16 +231,13 @@
                 @click="handleVolunteerAction('signup')"
               />
               <UButton
-                v-else-if="ride.status === 'ASSIGNED' && isAssignedToMe"
+                v-if="isVolunteer && isAssignedToMe && ride.status === 'ASSIGNED'"
                 label="Mark as Completed"
                 icon="i-lucide-check"
                 color="success"
                 class="flex-1 justify-center"
                 @click="handleVolunteerAction('complete')"
               />
-              <div v-else class="w-full text-center text-sm text-gray-500 italic">
-                {{ ride.status === 'COMPLETED' ? 'Ride Completed' : 'Not available' }}
-              </div>
             </div>
           </template>
         </UCard>
@@ -312,19 +305,23 @@
       <template #content>
         <UForm :schema="schema" :state="editState" class="space-y-4 p-4" @submit="handleUpdate">
           <UFormField label="Pickup Address" name="pickupDisplay">
-            <UInput v-model="editState.pickupDisplay" class="w-full" />
+            <UInput v-model="editState.pickupDisplay" class="w-full" :disabled="!isAdmin" />
           </UFormField>
 
           <UFormField label="Dropoff Address" name="dropoffDisplay">
-            <UInput v-model="editState.dropoffDisplay" class="w-full" />
+            <UInput v-model="editState.dropoffDisplay" class="w-full" :disabled="!isAdmin" />
           </UFormField>
 
           <UFormField label="Scheduled Time" name="scheduledTime">
-            <UInput v-model="editState.scheduledTime" type="datetime-local" class="w-full" />
+            <UInput v-model="editState.scheduledTime" type="datetime-local" class="w-full" :disabled="!isAdmin" />
           </UFormField>
 
           <UFormField label="Notes" name="notes">
-            <UTextarea v-model="editState.notes" class="w-full" />
+            <UTextarea v-model="editState.notes" class="w-full" :disabled="!isAdmin" />
+          </UFormField>
+
+          <UFormField label="Total Ride Time (Hours)" name="totalRideTime" v-if="ride.status === 'COMPLETED' || isAdmin">
+            <UInput v-model.number="editState.totalRideTime" type="number" step="0.1" class="w-full" />
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">
@@ -335,6 +332,35 @@
               @click="isEditModalOpen = false"
             />
             <UButton type="submit" label="Save Changes" color="primary" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+
+    <!-- Complete Ride Modal -->
+    <UModal v-model:open="isCompleteModalOpen" title="Complete Ride">
+      <template #content>
+        <UForm
+          :schema="z.object({ totalRideTime: z.number().min(0.1, 'Duration must be at least 0.1 hours') })"
+          :state="completeState"
+          class="space-y-4 p-4"
+          @submit="handleComplete"
+        >
+          <p class="text-sm text-gray-500">
+            Please enter the total time spent on this ride (including pickup and dropoff).
+          </p>
+          <UFormField label="Total Duration (Hours)" name="totalRideTime">
+            <UInput v-model.number="completeState.totalRideTime" type="number" step="0.1" class="w-full" />
+          </UFormField>
+
+          <div class="flex justify-end gap-2 pt-4">
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="ghost"
+              @click="isCompleteModalOpen = false"
+            />
+            <UButton type="submit" label="Mark as Completed" color="success" />
           </div>
         </UForm>
       </template>
