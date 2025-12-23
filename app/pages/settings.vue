@@ -139,6 +139,10 @@
               <p class="font-medium">{{ volunteer.user?.email }}</p>
             </div>
             <div>
+              <p class="text-sm text-gray-500">Phone</p>
+              <p class="font-medium">{{ formatPhoneNumber(volunteer.user?.phone) }}</p>
+            </div>
+            <div>
               <p class="text-sm text-gray-500 mb-1">Status</p>
               <USelect v-model="status" :items="statusOptions" />
             </div>

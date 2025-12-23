@@ -4,7 +4,7 @@ import { sendEmail } from './email'
 export async function processReminders() {
   const now = new Date()
 
-  // 1. Fetch upcoming rides that are assigned but not completed/cancelled
+  // 1. Fetch upcoming rides that are assigned but not completed
   const rides = await prisma.ride.findMany({
     where: {
       status: 'ASSIGNED',

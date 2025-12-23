@@ -77,6 +77,28 @@
     phone: '',
   })
 
+  // --- Phone Proxies ---
+  const volunteerPhoneProxy = computed({
+    get: () => formatPhoneNumber(volunteerState.phone),
+    set: (val: string) => {
+      volunteerState.phone = val.replace(/\D/g, '').slice(0, 10)
+    },
+  })
+
+  const clientPhoneProxy = computed({
+    get: () => formatPhoneNumber(clientState.phone),
+    set: (val: string) => {
+      clientState.phone = val.replace(/\D/g, '').slice(0, 10)
+    },
+  })
+
+  const adminPhoneProxy = computed({
+    get: () => formatPhoneNumber(adminState.phone),
+    set: (val: string) => {
+      adminState.phone = val.replace(/\D/g, '').slice(0, 10)
+    },
+  })
+
   // --- Computed ---
   const filteredVolunteers = computed(() => {
     if (!volunteers.value) return []
@@ -137,7 +159,11 @@
   const volunteerColumns: TableColumn<any>[] = [
     { accessorKey: 'user.name', header: 'Name' },
     { accessorKey: 'user.email', header: 'Email' },
-    { accessorKey: 'user.phone', header: 'Phone' },
+    {
+      accessorKey: 'user.phone',
+      header: 'Phone',
+      cell: ({ row }) => formatPhoneNumber(row.original.user.phone),
+    },
     {
       accessorKey: 'status',
       header: 'Status',
@@ -181,7 +207,11 @@
   const clientColumns: TableColumn<any>[] = [
     { accessorKey: 'user.name', header: 'Name' },
     { accessorKey: 'user.email', header: 'Email' },
-    { accessorKey: 'user.phone', header: 'Phone' },
+    {
+      accessorKey: 'user.phone',
+      header: 'Phone',
+      cell: ({ row }) => formatPhoneNumber(row.original.user.phone),
+    },
     {
       id: 'address',
       header: 'Address',
@@ -223,7 +253,11 @@
   const adminColumns: TableColumn<any>[] = [
     { accessorKey: 'name', header: 'Name' },
     { accessorKey: 'email', header: 'Email' },
-    { accessorKey: 'phone', header: 'Phone' },
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
+      cell: ({ row }) => formatPhoneNumber(row.original.phone),
+    },
     {
       id: 'actions',
       header: '',
@@ -482,7 +516,7 @@
             ><UInput v-model="volunteerState.email" class="w-full"
           /></UFormField>
           <UFormField label="Phone" name="phone"
-            ><UInput v-model="volunteerState.phone" class="w-full"
+            ><UInput v-model="volunteerPhoneProxy" class="w-full"
           /></UFormField>
           <UFormField label="Status" name="status">
             <USelect
@@ -520,7 +554,7 @@
             ><UInput v-model="clientState.email" class="w-full"
           /></UFormField>
           <UFormField label="Phone" name="phone"
-            ><UInput v-model="clientState.phone" class="w-full"
+            ><UInput v-model="clientPhoneProxy" class="w-full"
           /></UFormField>
           <UFormField label="Street" name="street"
             ><UInput v-model="clientState.street" class="w-full"
@@ -565,7 +599,7 @@
             ><UInput v-model="adminState.email" class="w-full"
           /></UFormField>
           <UFormField label="Phone" name="phone"
-            ><UInput v-model="adminState.phone" class="w-full"
+            ><UInput v-model="adminPhoneProxy" class="w-full"
           /></UFormField>
           <div class="flex justify-end gap-2 pt-4">
             <UButton

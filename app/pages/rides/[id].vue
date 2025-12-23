@@ -169,9 +169,7 @@
                 :color="
                   ride.status === 'COMPLETED'
                     ? 'success'
-                    : ride.status === 'CANCELLED'
-                      ? 'error'
-                      : 'info'
+                    : 'info'
                 "
                 variant="subtle"
               >
@@ -192,7 +190,7 @@
               <p class="text-sm text-gray-500">Client</p>
               <p class="font-medium">{{ ride.client?.user?.name }}</p>
               <!-- Hide client email from volunteers if strictly needed, but let's keep it for contact -->
-              <p class="text-sm text-gray-500">{{ ride.client?.user?.phone }}</p>
+              <p class="text-sm text-gray-500">{{ formatPhoneNumber(ride.client?.user?.phone) }}</p>
             </div>
 
             <div>
@@ -201,7 +199,7 @@
                 {{ ride.volunteer?.user?.name }}
               </p>
               <p class="text-gray-400 italic" v-else>No volunteer assigned</p>
-              <p class="text-sm text-gray-500">{{ ride.volunteer?.user?.phone }}</p>
+              <p class="text-sm text-gray-500">{{ formatPhoneNumber(ride.volunteer?.user?.phone) }}</p>
             </div>
 
             <div v-if="ride.status === 'COMPLETED' || ride.totalRideTime">

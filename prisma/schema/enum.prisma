@@ -8,5 +8,4 @@ enum RideStatus {
   CREATED
   ASSIGNED
   COMPLETED
-  CANCELLED
 }
