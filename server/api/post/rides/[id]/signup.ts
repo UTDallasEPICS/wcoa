@@ -35,6 +35,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  if (volunteer.status !== 'AVAILABLE') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Please set your status to 'AVAILABLE' in settings to sign up for a ride.",
+    })
+  }
+
   // 2. Check Ride status
   const ride = await prisma.ride.findUnique({
     where: { id }
