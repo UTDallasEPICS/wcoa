@@ -8,5 +8,21 @@ model Volunteer {
 
   rides Ride[]
 
+  reminders Reminder[]
+
   @@map("volunteer")
+}
+
+model Reminder {
+  id          String    @id @default(uuid())
+  volunteerId String
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  minutesBefore Int
+  type          String @default("email") // email or sms
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reminder")
 }

@@ -20,7 +20,7 @@
   const search = ref('')
   const volunteerStatusFilter = ref('All')
 
-  const volunteerStatusOptions = ['All', 'AVAILABLE', 'BUSY', 'INACTIVE']
+  const volunteerStatusOptions = ['All', 'AVAILABLE', 'UNAVAILABLE']
 
   // --- Schemas ---
   const volunteerSchema = z.object({
@@ -487,7 +487,7 @@
           <UFormField label="Status" name="status">
             <USelect
               v-model="volunteerState.status"
-              :items="['AVAILABLE', 'BUSY', 'INACTIVE']"
+              :items="['AVAILABLE', 'UNAVAILABLE']"
               class="w-full"
             />
           </UFormField>

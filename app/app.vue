@@ -49,15 +49,22 @@
     }
   }
 
-  const userMenuItems = [
-    [
-      {
-        label: 'Logout',
-        icon: 'i-lucide-log-out',
-        onSelect: handleLogout,
-      },
-    ],
-  ]
+  const userMenuItems = computed(() => {
+    const items = []
+    if (session.value?.user?.role === 'VOLUNTEER') {
+      items.push({
+        label: 'Settings',
+        icon: 'i-lucide-settings',
+        onSelect: () => navigateTo('/settings'),
+      })
+    }
+    items.push({
+      label: 'Logout',
+      icon: 'i-lucide-log-out',
+      onSelect: handleLogout,
+    })
+    return [items]
+  })
 </script>
 
 <template>
@@ -86,16 +93,6 @@
 
       <template #body>
         <UNavigationMenu :items="items" orientation="vertical" class="-mx-2.5" />
-        <div class="mt-4 border-t border-gray-200 dark:border-gray-800 pt-4">
-          <UButton
-            label="Logout"
-            icon="i-lucide-log-out"
-            color="neutral"
-            variant="ghost"
-            block
-            @click="handleLogout"
-          />
-        </div>
       </template>
     </UHeader>
 

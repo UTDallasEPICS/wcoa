@@ -89,7 +89,7 @@ async function main() {
   await prisma.user.create({
     data: {
       name: 'TW-NPTS',
-      email: 'tushar.wani@npts.com',
+      email: 'tushar.wani@npts.tech',
       role: 'VOLUNTEER',
       emailVerified: true,
       volunteer: {

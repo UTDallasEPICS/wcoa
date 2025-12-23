@@ -44,6 +44,7 @@ export default defineEventHandler(async (event) => {
       },
       include: {
         user: true,
+        reminders: true,
       },
     })
   })

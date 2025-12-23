@@ -1,0 +1,14 @@
+- send emails for actions
+    - a new ride is created
+        - send to all volunteers
+    - a new volunteer is created
+        - send to created volunteer
+    - when a volunteer signs up for a ride
+        - sent to admins
+        - sent to volunteer who signed up
+    - when a volunteer completed a ride
+        - sent to admins
+        - sent to volunteer who completed the ride
+
+- send emails for reminders
+    - based on the settings in the volunteers account send them reminders for their schedule rides

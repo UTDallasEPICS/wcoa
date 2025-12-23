@@ -24,5 +24,18 @@ model Ride {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  sentReminders SentReminder[]
+
   @@map("ride")
+}
+
+model SentReminder {
+  id     String   @id @default(uuid())
+  rideId String
+  ride   Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  type   String // e.g. '60'  minutes before value
+  sentAt DateTime @default(now())
+
+  @@unique([rideId, type])
+  @@map("sent_reminder")
 }
