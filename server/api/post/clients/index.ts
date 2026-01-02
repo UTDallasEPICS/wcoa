@@ -3,7 +3,7 @@ import { prisma } from '../../../utils/prisma'
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
-  if (!body.name || !body.email || !body.street || !body.city || !body.state || !body.zip) {
+  if (!body.name || !body.street || !body.city || !body.state || !body.zip) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Missing required fields',
@@ -11,15 +11,18 @@ export default defineEventHandler(async (event) => {
   }
 
   // 1. Upsert User
-  let user = await prisma.user.findUnique({
-    where: { email: body.email }
-  })
+  let user = null
+  if (body.email) {
+    user = await prisma.user.findUnique({
+      where: { email: body.email }
+    })
+  }
 
   if (!user) {
     user = await prisma.user.create({
       data: {
         name: body.name,
-        email: body.email,
+        email: body.email || null,
         phone: body.phone,
         role: 'CLIENT'
       }

@@ -325,73 +325,77 @@
     <!-- Edit Modal -->
     <UModal v-model:open="isEditModalOpen" title="Edit Ride">
       <template #content>
-        <UForm :schema="schema" :state="editState" class="space-y-4 p-4" @submit="handleUpdate">
-          <UFormField label="Pickup Address" name="pickupDisplay">
-            <UInput v-model="editState.pickupDisplay" class="w-full" :disabled="!isAdmin" />
-          </UFormField>
+        <div @click.stop>
+          <UForm :schema="schema" :state="editState" class="space-y-4 p-4" @submit="handleUpdate">
+            <UFormField label="Pickup Address" name="pickupDisplay">
+              <UInput v-model="editState.pickupDisplay" class="w-full" :disabled="!isAdmin" />
+            </UFormField>
 
-          <UFormField label="Dropoff Address" name="dropoffDisplay">
-            <UInput v-model="editState.dropoffDisplay" class="w-full" :disabled="!isAdmin" />
-          </UFormField>
+            <UFormField label="Dropoff Address" name="dropoffDisplay">
+              <UInput v-model="editState.dropoffDisplay" class="w-full" :disabled="!isAdmin" />
+            </UFormField>
 
-          <UFormField label="Scheduled Time" name="scheduledTime">
-            <UInput v-model="editState.scheduledTime" type="datetime-local" class="w-full" :disabled="!isAdmin" />
-          </UFormField>
+            <UFormField label="Scheduled Time" name="scheduledTime">
+              <UInput v-model="editState.scheduledTime" type="datetime-local" class="w-full" :disabled="!isAdmin" />
+            </UFormField>
 
-          <UFormField label="Notes" name="notes">
-            <UTextarea v-model="editState.notes" class="w-full" :disabled="!isAdmin" />
-          </UFormField>
+            <UFormField label="Notes" name="notes">
+              <UTextarea v-model="editState.notes" class="w-full" :disabled="!isAdmin" />
+            </UFormField>
 
-          <UFormField label="Total Ride Time (Hours)" name="totalRideTime" v-if="ride?.status === 'COMPLETED' || isAdmin">
-            <UInput v-model.number="editState.totalRideTime" type="number" step="0.1" class="w-full" />
-          </UFormField>
+            <UFormField label="Total Ride Time (Hours)" name="totalRideTime" v-if="ride?.status === 'COMPLETED' || isAdmin">
+              <UInput v-model.number="editState.totalRideTime" type="number" step="0.1" class="w-full" />
+            </UFormField>
 
-          <div class="flex justify-end gap-2 pt-4">
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="ghost"
-              @click="isEditModalOpen = false"
-            />
-            <UButton type="submit" label="Save Changes" color="primary" />
-          </div>
-        </UForm>
+            <div class="flex justify-end gap-2 pt-4">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                @click="isEditModalOpen = false"
+              />
+              <UButton type="submit" label="Save Changes" color="primary" />
+            </div>
+          </UForm>
+        </div>
       </template>
     </UModal>
 
     <!-- Complete Ride Modal -->
     <UModal v-model:open="isCompleteModalOpen" title="Complete Ride">
       <template #content>
-        <UForm
-          :schema="z.object({ totalRideTime: z.number().min(0.1, 'Duration must be at least 0.1 hours') })"
-          :state="completeState"
-          class="space-y-4 p-4"
-          @submit="handleComplete"
-        >
-          <p class="text-sm text-gray-500">
-            Please enter the total time spent on this ride (including pickup and dropoff).
-          </p>
-          <UFormField label="Total Duration (Hours)" name="totalRideTime">
-            <UInput v-model.number="completeState.totalRideTime" type="number" step="0.1" class="w-full" />
-          </UFormField>
+        <div @click.stop>
+          <UForm
+            :schema="z.object({ totalRideTime: z.number().min(0.1, 'Duration must be at least 0.1 hours') })"
+            :state="completeState"
+            class="space-y-4 p-4"
+            @submit="handleComplete"
+          >
+            <p class="text-sm text-gray-500">
+              Please enter the total time spent on this ride (including pickup and dropoff).
+            </p>
+            <UFormField label="Total Duration (Hours)" name="totalRideTime">
+              <UInput v-model.number="completeState.totalRideTime" type="number" step="0.1" class="w-full" />
+            </UFormField>
 
-          <div class="flex justify-end gap-2 pt-4">
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="ghost"
-              @click="isCompleteModalOpen = false"
-            />
-            <UButton type="submit" label="Mark as Completed" color="success" />
-          </div>
-        </UForm>
+            <div class="flex justify-end gap-2 pt-4">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                @click="isCompleteModalOpen = false"
+              />
+              <UButton type="submit" label="Mark as Completed" color="success" />
+            </div>
+          </UForm>
+        </div>
       </template>
     </UModal>
 
     <!-- Delete Confirmation Modal -->
     <UModal v-model:open="isDeleteModalOpen" title="Delete Ride">
       <template #content>
-        <div class="space-y-4 p-4">
+        <div class="space-y-4 p-4" @click.stop>
           <p>Are you sure you want to delete this ride? This action cannot be undone.</p>
           <div class="flex justify-end gap-2">
             <UButton

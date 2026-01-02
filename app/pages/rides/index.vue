@@ -58,7 +58,98 @@
     return options
   })
 
-  // ... (Schema and state definitions remain the same) ...
+  // --- Schema ---
+  const addressSchema = z.object({
+    street: z.string().min(1, 'Street is required'),
+    city: z.string().min(1, 'City is required'),
+    state: z.string().min(1, 'State is required'),
+    zip: z.string().min(1, 'Zip is required'),
+  })
+
+  const schema = z.object({
+    clientId: z.string().min(1, 'Client is required'),
+    pickup: addressSchema,
+    dropoff: addressSchema,
+    scheduledTime: z.string().min(1, 'Date is required'),
+    notes: z.string().optional(),
+  })
+
+  // --- State ---
+  const state = reactive({
+    clientId: '',
+    pickup: {
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+    },
+    dropoff: {
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+    },
+    scheduledTime: '',
+    notes: '',
+  })
+
+  // --- Autocomplete Logic ---
+  const pickupSearch = ref('')
+  const dropoffSearch = ref('')
+  
+  const { data: addresses } = await useFetch('/api/get/addresses')
+
+  const pickupOptions = computed(() => {
+    if (!pickupSearch.value || !addresses.value) return []
+    const q = pickupSearch.value.toLowerCase()
+    return addresses.value
+      .filter((a: any) => a.label.toLowerCase().includes(q))
+      .slice(0, 5)
+  })
+
+  const dropoffOptions = computed(() => {
+    if (!dropoffSearch.value || !addresses.value) return []
+    const q = dropoffSearch.value.toLowerCase()
+    return addresses.value
+      .filter((a: any) => a.label.toLowerCase().includes(q))
+      .slice(0, 5)
+  })
+
+  watch(
+    () => state.clientId,
+    (newId) => {
+      if (!newId || !clients.value) return
+      const client = clients.value.find((c: any) => c.id === newId)
+      if (client?.homeAddress) {
+        Object.assign(state.pickup, {
+          street: client.homeAddress.street,
+          city: client.homeAddress.city,
+          state: client.homeAddress.state,
+          zip: client.homeAddress.zip
+        })
+      }
+    }
+  )
+
+  function onPickupSelect(opt: any) {
+    Object.assign(state.pickup, {
+      street: opt.address.street,
+      city: opt.address.city,
+      state: opt.address.state,
+      zip: opt.address.zip
+    })
+    pickupSearch.value = ''
+  }
+
+  function onDropoffSelect(opt: any) {
+    Object.assign(state.dropoff, {
+      street: opt.address.street,
+      city: opt.address.city,
+      state: opt.address.state,
+      zip: opt.address.zip
+    })
+    dropoffSearch.value = ''
+  }
 
   const filteredRides = computed(() => {
     if (!rides.value) return []
@@ -272,7 +363,7 @@
     <!-- Create Ride Modal -->
     <UModal v-model:open="isCreateModalOpen" title="Create New Ride">
       <template #content>
-        <div class="max-h-[70vh] overflow-y-auto p-4">
+        <div class="max-h-[70vh] overflow-y-auto p-4" @click.stop>
           <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
             <UFormField label="Client" name="clientId">
               <USelect
@@ -293,6 +384,7 @@
                   placeholder="Type to find existing address (e.g. Street)..."
                   icon="i-lucide-search"
                   autocomplete="off"
+                  class="w-full"
                 />
                 <div
                   v-if="pickupOptions?.length > 0 && pickupSearch"
@@ -311,7 +403,7 @@
               </div>
 
               <UFormField label="Street" name="pickup.street">
-                <UInput v-model="state.pickup.street" placeholder="Street Address" />
+                <UInput v-model="state.pickup.street" placeholder="Street Address" class="w-full" />
               </UFormField>
               <div class="grid grid-cols-3 gap-2">
                 <UFormField label="City" name="pickup.city"
@@ -336,6 +428,7 @@
                   placeholder="Type to find existing address (e.g. Street)..."
                   icon="i-lucide-search"
                   autocomplete="off"
+                  class="w-full"
                 />
                 <div
                   v-if="dropoffOptions?.length > 0 && dropoffSearch"
@@ -354,7 +447,7 @@
               </div>
 
               <UFormField label="Street" name="dropoff.street">
-                <UInput v-model="state.dropoff.street" placeholder="Street Address" />
+                <UInput v-model="state.dropoff.street" placeholder="Street Address" class="w-full" />
               </UFormField>
               <div class="grid grid-cols-3 gap-2">
                 <UFormField label="City" name="dropoff.city"

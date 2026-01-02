@@ -24,12 +24,12 @@ export default defineEventHandler(async (event) => {
 
   return await prisma.$transaction(async (tx) => {
     // Update User
-    if (body.name || body.email || body.phone) {
+    if (body.name || body.email !== undefined || body.phone !== undefined) {
       await tx.user.update({
         where: { id: client.userId },
         data: {
           name: body.name,
-          email: body.email,
+          email: body.email || null,
           phone: body.phone,
         },
       })

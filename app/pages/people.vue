@@ -32,7 +32,7 @@
 
   const clientSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    email: z.string().email('Invalid email'),
+    email: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
     phone: z.string().optional(),
     street: z.string().min(1, 'Street is required'),
     city: z.string().min(1, 'City is required'),
@@ -114,7 +114,7 @@
     if (search.value) {
       const q = search.value.toLowerCase()
       result = result.filter(
-        (v: any) => v.user.name.toLowerCase().includes(q) || v.user.email.toLowerCase().includes(q)
+        (v: any) => v.user.name.toLowerCase().includes(q) || (v.user.email?.toLowerCase().includes(q) ?? false)
       )
     }
 
@@ -125,7 +125,7 @@
     if (!clients.value) return []
     const q = search.value.toLowerCase()
     return clients.value.filter(
-      (c: any) => c.user.name.toLowerCase().includes(q) || c.user.email.toLowerCase().includes(q)
+      (c: any) => c.user.name.toLowerCase().includes(q) || (c.user.email?.toLowerCase().includes(q) ?? false)
     )
   })
 
@@ -133,7 +133,7 @@
     if (!admins.value) return []
     const q = search.value.toLowerCase()
     return admins.value.filter(
-      (a: any) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+      (a: any) => a.name.toLowerCase().includes(q) || (a.email?.toLowerCase().includes(q) ?? false)
     )
   })
 
@@ -206,7 +206,11 @@
 
   const clientColumns: TableColumn<any>[] = [
     { accessorKey: 'user.name', header: 'Name' },
-    { accessorKey: 'user.email', header: 'Email' },
+    { 
+      accessorKey: 'user.email', 
+      header: 'Email',
+      cell: ({ row }) => row.original.user.email || 'N/A'
+    },
     {
       accessorKey: 'user.phone',
       header: 'Phone',
@@ -352,7 +356,7 @@
     const addr = client.homeAddress || {}
     Object.assign(clientState, {
       name: client.user.name,
-      email: client.user.email,
+      email: client.user.email || '',
       phone: client.user.phone || '',
       street: addr.street || '',
       city: addr.city || '',
@@ -503,121 +507,127 @@
       :title="editingId ? 'Edit Volunteer' : 'Add Volunteer'"
     >
       <template #content>
-        <UForm
-          :schema="volunteerSchema"
-          :state="volunteerState"
-          class="space-y-4 p-4"
-          @submit="handleVolunteerSubmit"
-        >
-          <UFormField label="Name" name="name"
-            ><UInput v-model="volunteerState.name" class="w-full"
-          /></UFormField>
-          <UFormField label="Email" name="email"
-            ><UInput v-model="volunteerState.email" class="w-full"
-          /></UFormField>
-          <UFormField label="Phone" name="phone"
-            ><UInput v-model="volunteerPhoneProxy" class="w-full"
-          /></UFormField>
-          <UFormField label="Status" name="status">
-            <USelect
-              v-model="volunteerState.status"
-              :items="['AVAILABLE', 'UNAVAILABLE']"
-              class="w-full"
-            />
-          </UFormField>
-          <div class="flex justify-end gap-2 pt-4">
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="ghost"
-              @click="isVolunteerModalOpen = false"
-            />
-            <UButton type="submit" label="Save" color="primary" />
-          </div>
-        </UForm>
+        <div @click.stop>
+          <UForm
+            :schema="volunteerSchema"
+            :state="volunteerState"
+            class="space-y-4 p-4"
+            @submit="handleVolunteerSubmit"
+          >
+            <UFormField label="Name" name="name"
+              ><UInput v-model="volunteerState.name" class="w-full"
+            /></UFormField>
+            <UFormField label="Email" name="email"
+              ><UInput v-model="volunteerState.email" class="w-full"
+            /></UFormField>
+            <UFormField label="Phone" name="phone"
+              ><UInput v-model="volunteerPhoneProxy" class="w-full"
+            /></UFormField>
+            <UFormField label="Status" name="status">
+              <USelect
+                v-model="volunteerState.status"
+                :items="['AVAILABLE', 'UNAVAILABLE']"
+                class="w-full"
+              />
+            </UFormField>
+            <div class="flex justify-end gap-2 pt-4">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                @click="isVolunteerModalOpen = false"
+              />
+              <UButton type="submit" label="Save" color="primary" />
+            </div>
+          </UForm>
+        </div>
       </template>
     </UModal>
 
     <!-- Client Modal -->
     <UModal v-model:open="isClientModalOpen" :title="editingId ? 'Edit Client' : 'Add Client'">
       <template #content>
-        <UForm
-          :schema="clientSchema"
-          :state="clientState"
-          class="space-y-4 p-4"
-          @submit="handleClientSubmit"
-        >
-          <UFormField label="Name" name="name"
-            ><UInput v-model="clientState.name" class="w-full"
-          /></UFormField>
-          <UFormField label="Email" name="email"
-            ><UInput v-model="clientState.email" class="w-full"
-          /></UFormField>
-          <UFormField label="Phone" name="phone"
-            ><UInput v-model="clientPhoneProxy" class="w-full"
-          /></UFormField>
-          <UFormField label="Street" name="street"
-            ><UInput v-model="clientState.street" class="w-full"
-          /></UFormField>
-          <div class="grid grid-cols-2 gap-4">
-            <UFormField label="City" name="city"
-              ><UInput v-model="clientState.city" class="w-full"
+        <div @click.stop>
+          <UForm
+            :schema="clientSchema"
+            :state="clientState"
+            class="space-y-4 p-4"
+            @submit="handleClientSubmit"
+          >
+            <UFormField label="Name" name="name"
+              ><UInput v-model="clientState.name" class="w-full"
             /></UFormField>
-            <UFormField label="State" name="state"
-              ><UInput v-model="clientState.state" class="w-full"
+            <UFormField label="Email" name="email"
+              ><UInput v-model="clientState.email" class="w-full"
             /></UFormField>
-          </div>
-          <UFormField label="Zip" name="zip"
-            ><UInput v-model="clientState.zip" class="w-full"
-          /></UFormField>
-          <div class="flex justify-end gap-2 pt-4">
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="ghost"
-              @click="isClientModalOpen = false"
-            />
-            <UButton type="submit" label="Save" color="primary" />
-          </div>
-        </UForm>
+            <UFormField label="Phone" name="phone"
+              ><UInput v-model="clientPhoneProxy" class="w-full"
+            /></UFormField>
+            <UFormField label="Street" name="street"
+              ><UInput v-model="clientState.street" class="w-full"
+            /></UFormField>
+            <div class="grid grid-cols-2 gap-4">
+              <UFormField label="City" name="city"
+                ><UInput v-model="clientState.city" class="w-full"
+              /></UFormField>
+              <UFormField label="State" name="state"
+                ><UInput v-model="clientState.state" class="w-full"
+              /></UFormField>
+            </div>
+            <UFormField label="Zip" name="zip"
+              ><UInput v-model="clientState.zip" class="w-full"
+            /></UFormField>
+            <div class="flex justify-end gap-2 pt-4">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                @click="isClientModalOpen = false"
+              />
+              <UButton type="submit" label="Save" color="primary" />
+            </div>
+          </UForm>
+        </div>
       </template>
     </UModal>
 
     <!-- Admin Modal -->
     <UModal v-model:open="isAdminModalOpen" :title="editingId ? 'Edit Admin' : 'Add Admin'">
       <template #content>
-        <UForm
-          :schema="adminSchema"
-          :state="adminState"
-          class="space-y-4 p-4"
-          @submit="handleAdminSubmit"
-        >
-          <UFormField label="Name" name="name"
-            ><UInput v-model="adminState.name" class="w-full"
-          /></UFormField>
-          <UFormField label="Email" name="email"
-            ><UInput v-model="adminState.email" class="w-full"
-          /></UFormField>
-          <UFormField label="Phone" name="phone"
-            ><UInput v-model="adminPhoneProxy" class="w-full"
-          /></UFormField>
-          <div class="flex justify-end gap-2 pt-4">
-            <UButton
-              label="Cancel"
-              color="neutral"
-              variant="ghost"
-              @click="isAdminModalOpen = false"
-            />
-            <UButton type="submit" label="Save" color="primary" />
-          </div>
-        </UForm>
+        <div @click.stop>
+          <UForm
+            :schema="adminSchema"
+            :state="adminState"
+            class="space-y-4 p-4"
+            @submit="handleAdminSubmit"
+          >
+            <UFormField label="Name" name="name"
+              ><UInput v-model="adminState.name" class="w-full"
+            /></UFormField>
+            <UFormField label="Email" name="email"
+              ><UInput v-model="adminState.email" class="w-full"
+            /></UFormField>
+            <UFormField label="Phone" name="phone"
+              ><UInput v-model="adminPhoneProxy" class="w-full"
+            /></UFormField>
+            <div class="flex justify-end gap-2 pt-4">
+              <UButton
+                label="Cancel"
+                color="neutral"
+                variant="ghost"
+                @click="isAdminModalOpen = false"
+              />
+              <UButton type="submit" label="Save" color="primary" />
+            </div>
+          </UForm>
+        </div>
       </template>
     </UModal>
 
     <!-- Delete Modal -->
     <UModal v-model:open="isDeleteModalOpen" title="Confirm Delete">
       <template #content>
-        <div class="space-y-4 p-4">
+        <div class="space-y-4 p-4" @click.stop>
           <p>Are you sure? This will remove the profile.</p>
           <div class="flex justify-end gap-2">
             <UButton
