@@ -10,7 +10,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm64
 
     steps:
       - name: Checkout code
