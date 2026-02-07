@@ -5,7 +5,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-RUN pnpm i --force
+RUN pnpm i
 RUN npx prisma generate
 RUN pnpm run build
 
