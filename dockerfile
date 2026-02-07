@@ -31,26 +31,31 @@ COPY . .
 RUN npx prisma generate
 RUN pnpm run build
 
-# Clean up non-production dependencies to keep the image slim
-# This ensures better-sqlite3 remains compiled for ARM
+# Prune to remove devDependencies (saves hundreds of MBs)
 RUN pnpm prune --prod
 
-# Stage 2: Deployment
+# --- Stage 2: Deployment ---
 FROM node:22-slim AS deployment
+# Need openssl for Prisma runtime
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Copy the built Nuxt output
+# 1. Copy the built Nuxt output
 COPY --from=builder /app/.output ./.output
 
-# Copy the production node_modules which contains the compiled better-sqlite3 binaries
-# This is the missing link that was causing the "bindings" error
+# 2. Copy production node_modules (contains the compiled better-sqlite3)
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy Prisma schema (often needed for runtime migrations)
+# 3. Copy package.json (helps Node resolve paths correctly)
+COPY --from=builder /app/package.json ./package.json
+
+# 4. Copy Prisma schema and the generated client
+# This is vital for SQLite migrations/access
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 ENV NODE_ENV=production
 
+# Recommended: Check if the database file exists/migrate before starting
+# CMD npx prisma migrate deploy && node .output/server/index.mjs
 CMD ["node", ".output/server/index.mjs"]
