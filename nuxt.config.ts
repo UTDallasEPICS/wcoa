@@ -8,4 +8,9 @@ export default defineNuxtConfig({
       googleMapsApiKey: '', // Overridden by NUXT_PUBLIC_GOOGLE_MAPS_API_KEY
     },
   },
+  nitro: {
+    externals: {
+      external: ['better-sqlite3']
+    }
+  }
 })
