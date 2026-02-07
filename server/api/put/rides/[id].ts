@@ -17,6 +17,15 @@ export default defineEventHandler(async (event) => {
     updateData.scheduledTime = new Date(updateData.scheduledTime)
   }
 
+  // Handle volunteer assignment/unassignment
+  if (body.volunteerId !== undefined) {
+    if (body.volunteerId && body.volunteerId.trim() !== '') {
+      updateData.volunteerId = body.volunteerId
+    } else {
+      updateData.volunteerId = null
+    }
+  }
+
   const ride = await prisma.ride.update({
     where: { id },
     data: updateData,

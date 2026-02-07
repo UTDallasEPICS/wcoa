@@ -11,6 +11,7 @@
 
   const { data: rides, status, refresh: refreshRides } = await useFetch('/api/get/rides')
   const { data: clients } = await useFetch('/api/get/clients')
+  const { data: volunteers } = await useFetch('/api/get/volunteers')
 
   const search = ref('')
 
@@ -72,6 +73,7 @@
     dropoff: addressSchema,
     scheduledTime: z.string().min(1, 'Date is required'),
     notes: z.string().optional(),
+    volunteerId: z.any().optional(),
   })
 
   // --- State ---
@@ -91,6 +93,7 @@
     },
     scheduledTime: '',
     notes: '',
+    volunteerId: undefined as any,
   })
 
   // --- Autocomplete Logic ---
@@ -113,6 +116,15 @@
     return addresses.value
       .filter((a: any) => a.label.toLowerCase().includes(q))
       .slice(0, 5)
+  })
+  
+  const volunteerOptions = computed(() => {
+    if (!volunteers.value) return []
+    const list = volunteers.value.map((v: any) => ({
+      label: v.user?.name || 'Unknown Volunteer',
+      value: v.id,
+    }))
+    return [{ label: 'Unassigned', value: '' }, ...list]
   })
 
   watch(
@@ -288,9 +300,21 @@
 
   async function onSubmit(event: any) {
     try {
+      // Convert local datetime-local string to ISO string (UTC)
+      const scheduledTimeISO = new Date(event.data.scheduledTime).toISOString()
+      
+      // Handle volunteerId being an object or string
+      const vId = typeof event.data.volunteerId === 'object' 
+        ? event.data.volunteerId.value 
+        : event.data.volunteerId
+
       await $fetch('/api/post/rides', {
         method: 'POST',
-        body: event.data,
+        body: {
+          ...event.data,
+          volunteerId: vId,
+          scheduledTime: scheduledTimeISO,
+        },
       })
       isCreateModalOpen.value = false
       await refreshRides()
@@ -301,6 +325,7 @@
         dropoffDisplay: '',
         scheduledTime: '',
         notes: '',
+        volunteerId: undefined,
       })
     } catch (err) {
       console.error('Failed to create ride', err)
@@ -363,7 +388,7 @@
     <!-- Create Ride Modal -->
     <UModal v-model:open="isCreateModalOpen" title="Create New Ride">
       <template #content>
-        <div class="max-h-[70vh] overflow-y-auto p-4" @click.stop>
+        <div class="max-h-[70vh] overflow-y-auto p-4">
           <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
             <UFormField label="Client" name="clientId">
               <USelect
@@ -461,6 +486,17 @@
                 /></UFormField>
               </div>
             </div>
+
+            <UFormField label="Volunteer" name="volunteerId" v-if="isAdmin">
+              <USelectMenu
+                v-model="state.volunteerId"
+                :items="volunteerOptions"
+                placeholder="Select a volunteer"
+                class="w-full"
+                searchable
+                option-attribute="label"
+              />
+            </UFormField>
 
             <UFormField label="Scheduled Time" name="scheduledTime">
               <UInput v-model="state.scheduledTime" type="datetime-local" class="w-full" />

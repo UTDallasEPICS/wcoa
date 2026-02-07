@@ -9,6 +9,7 @@
   const { data: session } = await authClient.useSession(useFetch)
   const { data: ride, status, refresh: refreshRide } = await useFetch(`/api/get/rides/byId/${id}`)
   const { data: estimate } = await useFetch(`/api/get/rides/estimate/${id}`)
+  const { data: volunteers } = await useFetch('/api/get/volunteers')
 
   const isEditModalOpen = ref(false)
   const isCompleteModalOpen = ref(false)
@@ -26,6 +27,7 @@
     scheduledTime: z.string().min(1, 'Scheduled time is required'),
     notes: z.string().optional(),
     totalRideTime: z.number().optional(),
+    volunteerId: z.any().optional(),
   })
 
   const editState = reactive({
@@ -34,6 +36,7 @@
     scheduledTime: '',
     notes: '',
     totalRideTime: 0,
+    volunteerId: undefined as any,
   })
 
   const completeState = reactive({
@@ -52,14 +55,36 @@
         .slice(0, 16)
       editState.notes = ride.value.notes || ''
       editState.totalRideTime = ride.value.totalRideTime || 0
+      
+      // Handle volunteer object binding for USelectMenu
+      if (ride.value.volunteerId) {
+        const found = volunteers.value?.find((v: any) => v.id === ride.value.volunteerId)
+        editState.volunteerId = found 
+          ? { label: found.user.name, value: found.id } 
+          : undefined
+      } else {
+        editState.volunteerId = undefined // or { label: 'Unassigned', value: '' } if preferred
+      }
     }
   })
 
   async function handleUpdate(event: any) {
     try {
+      // Convert local datetime-local string to ISO string (UTC)
+      const scheduledTimeISO = new Date(event.data.scheduledTime).toISOString()
+      
+      // Normalize volunteerId
+      const vId = typeof event.data.volunteerId === 'object' 
+        ? event.data.volunteerId.value 
+        : event.data.volunteerId
+
       await $fetch(`/api/put/rides/${id}`, {
         method: 'PUT',
-        body: event.data,
+        body: {
+          ...event.data,
+          volunteerId: vId,
+          scheduledTime: scheduledTimeISO
+        },
       })
       toast.add({ title: 'Success', description: 'Ride updated successfully', color: 'success' })
       isEditModalOpen.value = false
@@ -140,6 +165,15 @@
     const destination = encodeURIComponent(ride.value.dropoffDisplay)
     const apiKey = useRuntimeConfig().public.googleMapsApiKey
     return `https://www.google.com/maps/embed/v1/directions?key=${apiKey || ''}&origin=${origin}&destination=${destination}`
+  })
+
+  const volunteerOptions = computed(() => {
+    if (!volunteers.value) return []
+    const list = volunteers.value.map((v: any) => ({
+      label: v.user?.name || 'Unknown Volunteer',
+      value: v.id,
+    }))
+    return [{ label: 'Unassigned', value: '' }, ...list]
   })
 
   const breadcrumbs = [{ label: 'Rides', to: '/rides' }, { label: 'Ride Details' }]
@@ -325,7 +359,7 @@
     <!-- Edit Modal -->
     <UModal v-model:open="isEditModalOpen" title="Edit Ride">
       <template #content>
-        <div @click.stop>
+        <div class="">
           <UForm :schema="schema" :state="editState" class="space-y-4 p-4" @submit="handleUpdate">
             <UFormField label="Pickup Address" name="pickupDisplay">
               <UInput v-model="editState.pickupDisplay" class="w-full" :disabled="!isAdmin" />
@@ -333,6 +367,17 @@
 
             <UFormField label="Dropoff Address" name="dropoffDisplay">
               <UInput v-model="editState.dropoffDisplay" class="w-full" :disabled="!isAdmin" />
+            </UFormField>
+
+            <UFormField label="Volunteer" name="volunteerId" v-if="isAdmin">
+              <USelectMenu
+                v-model="editState.volunteerId"
+                :items="volunteerOptions"
+                placeholder="Select a volunteer"
+                class="w-full"
+                searchable
+                option-attribute="label"
+              />
             </UFormField>
 
             <UFormField label="Scheduled Time" name="scheduledTime">
@@ -364,11 +409,10 @@
     <!-- Complete Ride Modal -->
     <UModal v-model:open="isCompleteModalOpen" title="Complete Ride">
       <template #content>
-        <div @click.stop>
+        <div class="space-y-4 p-4">
           <UForm
             :schema="z.object({ totalRideTime: z.number().min(0.1, 'Duration must be at least 0.1 hours') })"
             :state="completeState"
-            class="space-y-4 p-4"
             @submit="handleComplete"
           >
             <p class="text-sm text-gray-500">
@@ -395,7 +439,7 @@
     <!-- Delete Confirmation Modal -->
     <UModal v-model:open="isDeleteModalOpen" title="Delete Ride">
       <template #content>
-        <div class="space-y-4 p-4" @click.stop>
+        <div class="space-y-4 p-4">
           <p>Are you sure you want to delete this ride? This action cannot be undone.</p>
           <div class="flex justify-end gap-2">
             <UButton

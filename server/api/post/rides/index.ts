@@ -47,7 +47,8 @@ export default defineEventHandler(async (event) => {
       dropoffAddressId: dropoffAddress.id,
       scheduledTime: new Date(body.scheduledTime),
       notes: body.notes,
-      status: 'CREATED',
+      volunteerId: body.volunteerId ? body.volunteerId : undefined,
+      status: body.volunteerId ? 'ASSIGNED' : 'CREATED',
     },
   })
 
@@ -59,6 +60,13 @@ export default defineEventHandler(async (event) => {
 
   const emailPromises = volunteers.map(volunteer => {
     if (volunteer.user.email) {
+      const formattedTime = new Date(body.scheduledTime).toLocaleString('en-US', {
+        timeZone: 'America/Chicago',
+        dateStyle: 'full',
+        timeStyle: 'short',
+      })
+      const dashboardUrl = process.env.BETTER_AUTH_URL || ''
+
       return sendEmail(
         volunteer.user.email,
         'New Ride Available',
@@ -67,8 +75,8 @@ export default defineEventHandler(async (event) => {
           <p>A new ride has been posted.</p>
           <p><strong>From:</strong> ${pickupDisplay}</p>
           <p><strong>To:</strong> ${dropoffDisplay}</p>
-          <p><strong>Time:</strong> ${new Date(body.scheduledTime).toLocaleString()}</p>
-          <p>Login to the dashboard to sign up.</p>
+          <p><strong>Time:</strong> ${formattedTime}</p>
+          <p><a href="${dashboardUrl}/rides">Login to the dashboard to sign up.</a></p>
         `
       )
     }
