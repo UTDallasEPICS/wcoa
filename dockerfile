@@ -36,26 +36,23 @@ RUN pnpm prune --prod
 
 # --- Stage 2: Deployment ---
 FROM node:22-slim AS deployment
-# Need openssl for Prisma runtime
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # 1. Copy the built Nuxt output
 COPY --from=builder /app/.output ./.output
 
-# 2. Copy production node_modules (contains the compiled better-sqlite3)
+# 2. Copy production node_modules 
+# IMPORTANT: Also copy the node_modules from inside the server output if they exist
 COPY --from=builder /app/node_modules ./node_modules
 
-# 3. Copy package.json (helps Node resolve paths correctly)
+# 3. Copy package.json and Prisma
 COPY --from=builder /app/package.json ./package.json
-
-# 4. Copy Prisma schema and the generated client
-# This is vital for SQLite migrations/access
 COPY --from=builder /app/prisma ./prisma
 
+# NEW: Set this env var to help Node find the bindings
+ENV NODE_PATH=/app/node_modules
 EXPOSE 3000
 ENV NODE_ENV=production
 
-# Recommended: Check if the database file exists/migrate before starting
-# CMD npx prisma migrate deploy && node .output/server/index.mjs
 CMD ["node", ".output/server/index.mjs"]
