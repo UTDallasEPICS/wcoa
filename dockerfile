@@ -1,6 +1,8 @@
 # Stage 1: Build
 FROM node:22-slim AS builder
 
+ENV CI=true
+
 # Install build essentials for native modules (better-sqlite3)
 RUN apt-get update && apt-get install -y \
     openssl \
