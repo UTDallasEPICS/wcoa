@@ -9,7 +9,7 @@ jobs:
   build:
     permissions:
       id-token: write
-      content: read
+      contents: read
     runs-on: ubuntu-latest
 
     steps:
