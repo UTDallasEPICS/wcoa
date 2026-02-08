@@ -3,11 +3,10 @@ COPY . ./
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN npm install -g pnpm
 
-RUN pnpm i
+RUN npm i
 RUN npx prisma generate
-RUN pnpm run build
+RUN npm run build
 
 FROM node:22-alpine AS deployment
 
