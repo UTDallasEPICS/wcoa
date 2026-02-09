@@ -9,11 +9,11 @@
   const { data: session } = await authClient.useSession(useFetch)
   const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
 
-  const { data: rides, status, refresh: refreshRides } = await useFetch('/api/get/rides')
   const { data: clients } = await useFetch('/api/get/clients')
   const { data: volunteers } = await useFetch('/api/get/volunteers')
 
   const search = ref('')
+  const sort = ref('asc') // Default sort: Soonest first
 
   // Persisted State
   const savedActiveFilters = useCookie<{ label: string; value: string }[]>('ride-active-filters', {
@@ -21,11 +21,16 @@
   })
   const savedExcludedFilters = useCookie<{ label: string; value: string }[]>(
     'ride-excluded-filters',
-    { default: () => [] }
+    { default: () => [{ label: 'Completed', value: 'status:COMPLETED' }, { label: 'Cancelled', value: 'status:CANCELLED' }] } // Default exclude
   )
 
   const activeFilters = ref<{ label: string; value: string }[]>(savedActiveFilters.value)
   const excludedFilters = ref<{ label: string; value: string }[]>(savedExcludedFilters.value)
+
+  // Use watch to refetch when sort changes
+  const { data: rides, status, refresh: refreshRides } = await useFetch('/api/get/rides', {
+    query: { sort }
+  })
 
   // Sync state back to cookies
   watch(
@@ -351,6 +356,11 @@
         icon="i-lucide-search"
         placeholder="Search..."
         class="w-full min-w-[200px] flex-1 sm:w-auto"
+      />
+      <USelect
+        v-model="sort"
+        :items="[{ label: 'Oldest First', value: 'asc' }, { label: 'Newest First', value: 'desc' }]"
+        class="w-36"
       />
       <USelectMenu
         v-model="activeFilters"

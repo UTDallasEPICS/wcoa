@@ -1,6 +1,9 @@
 import { prisma } from '../../../utils/prisma'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  const query = getQuery(event)
+  const sort = query.sort === 'desc' ? 'desc' : 'asc'
+
   return await prisma.ride.findMany({
     include: {
       client: {
@@ -15,7 +18,7 @@ export default defineEventHandler(async () => {
       },
     },
     orderBy: {
-      scheduledTime: 'asc',
+      scheduledTime: sort,
     },
   })
 })
