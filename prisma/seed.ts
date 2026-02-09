@@ -164,6 +164,44 @@ async function main() {
     await prisma.ride.create({ data: ride as any })
   }
 
+  console.log('--- Seeding Notification Templates ---')
+  
+  const templates = [
+    {
+      name: 'RIDE_CREATED',
+      subject: 'New Ride Available: {{pickup}} to {{dropoff}}',
+      body: '<p>Hi {{name}},</p><p>A new ride is available on {{date}} at {{time}}.</p><p><strong>Pickup:</strong> {{pickup}}</p><p><strong>Dropoff:</strong> {{dropoff}}</p>',
+    },
+    {
+      name: 'RIDE_ASSIGNED',
+      subject: 'You have been assigned to a ride',
+      body: '<p>Hi {{name}},</p><p>You have successfully signed up for a ride on {{date}} at {{time}}.</p><p><strong>Client:</strong> {{client}}</p><p><strong>Pickup:</strong> {{pickup}}</p><p><strong>Dropoff:</strong> {{dropoff}}</p>',
+    },
+    {
+      name: 'RIDE_REMINDER',
+      subject: 'Reminder: Upcoming Ride with {{client}}',
+      body: '<p>Hi {{name}},</p><p>This is a reminder for your ride tomorrow at {{time}}.</p><p><strong>Client:</strong> {{client}}</p><p><strong>Pickup:</strong> {{pickup}}</p><p><strong>Dropoff:</strong> {{dropoff}}</p>',
+    },
+    {
+      name: 'RIDE_CANCELLED',
+      subject: 'Ride Cancelled',
+      body: '<p>Hi {{name}},</p><p>The ride scheduled for {{date}} has been cancelled.</p>',
+    },
+    {
+      name: 'RIDE_COMPLETED',
+      subject: 'Thank you for completing the ride',
+      body: '<p>Hi {{name}},</p><p>Thank you for volunteering! The ride with {{client}} has been marked as completed.</p>',
+    },
+  ]
+
+  for (const t of templates) {
+    await prisma.notificationTemplate.upsert({
+      where: { name: t.name },
+      update: {},
+      create: t,
+    })
+  }
+
   console.log('Seeding finished successfully.')
 }
 

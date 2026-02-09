@@ -1,6 +1,7 @@
 import { prisma } from '../../../../utils/prisma'
 import { auth } from '../../../../utils/auth'
 import { sendEmail } from '../../../../utils/email'
+import { sendNotification } from '../../../../utils/notification'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -46,7 +47,14 @@ export default defineEventHandler(async (event) => {
 
   // 2. Check Ride status
   const ride = await prisma.ride.findUnique({
-    where: { id }
+    where: { id },
+    include: {
+      client: {
+        include: {
+          user: true
+        }
+      }
+    }
   })
 
   if (!ride) {
@@ -84,17 +92,16 @@ export default defineEventHandler(async (event) => {
 
   // To Volunteer
   if (volunteerEmail) {
-    notifications.push(sendEmail(
-      volunteerEmail,
-      'Ride Signup Confirmation',
-      `
-        <h1>Signup Confirmed</h1>
-        <p>You have successfully signed up for the following ride:</p>
-        <p><strong>From:</strong> ${ride.pickupDisplay}</p>
-        <p><strong>To:</strong> ${ride.dropoffDisplay}</p>
-        <p><strong>Time:</strong> ${new Date(ride.scheduledTime).toLocaleString()}</p>
-      `
-    ))
+    const formattedTime = new Date(ride.scheduledTime).toLocaleString()
+    notifications.push(sendNotification('RIDE_ASSIGNED', volunteer.id, {
+      name: volunteer.user.name,
+      date: formattedTime.split(',')[0],
+      time: formattedTime,
+      client: ride.client.user.name,
+      pickup: ride.pickupDisplay,
+      dropoff: ride.dropoffDisplay,
+      link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${id}`
+    }))
   }
 
   // To Admins

@@ -15,7 +15,7 @@ export default defineEventHandler(async () => {
       },
     },
     orderBy: {
-      scheduledTime: 'desc',
+      scheduledTime: 'asc',
     },
   })
 })

@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { sendEmail } from './email'
+import { sendNotification } from './notification'
 
 export async function processReminders() {
   const now = new Date()
@@ -45,7 +45,15 @@ export async function processReminders() {
 
         if (!alreadySent) {
           try {
-            await sendReminderEmail(ride, reminderConfig.minutesBefore)
+            await sendNotification('RIDE_REMINDER', ride.volunteer.id, {
+              name: ride.volunteer.user.name,
+              client: ride.client.user.name,
+              pickup: ride.pickupDisplay,
+              dropoff: ride.dropoffDisplay,
+              time: scheduledTime.toLocaleString(),
+              notes: ride.notes || 'None',
+              link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
+            })
             
             // Log that it was sent
             await prisma.sentReminder.create({
@@ -64,24 +72,3 @@ export async function processReminders() {
   }
 }
 
-async function sendReminderEmail(ride: any, minutesBefore: number) {
-  const volunteerEmail = ride.volunteer.user.email
-  const timeStr = new Date(ride.scheduledTime).toLocaleString()
-  
-  const subject = `Upcoming Ride Reminder: ${ride.pickupDisplay}`
-  const text = `
-    Hi ${ride.volunteer.user.name},
-    
-    This is a reminder for your upcoming ride.
-    
-    Scheduled Time: ${timeStr}
-    Client: ${ride.client.user.name}
-    Pickup: ${ride.pickupDisplay}
-    Dropoff: ${ride.dropoffDisplay}
-    Notes: ${ride.notes || 'None'}
-    
-    Thank you for volunteering!
-  `
-  
-  await sendEmail(volunteerEmail, subject, text)
-}

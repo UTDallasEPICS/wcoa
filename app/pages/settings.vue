@@ -18,6 +18,15 @@
   const statusOptions = ['AVAILABLE', 'UNAVAILABLE']
   const isSyncing = ref(false)
 
+  const notifications = ref<Record<string, boolean>>({})
+  const notificationTypes = [
+    { key: 'RIDE_CREATED', label: 'New Ride Available' },
+    { key: 'RIDE_ASSIGNED', label: 'Ride Assigned' },
+    { key: 'RIDE_REMINDER', label: 'Ride Reminder' },
+    { key: 'RIDE_CANCELLED', label: 'Ride Cancelled' },
+    { key: 'RIDE_COMPLETED', label: 'Ride Completed' },
+  ]
+
   watch(
     volunteer,
     (val) => {
@@ -35,6 +44,13 @@
         }
         status.value = val.status || 'AVAILABLE'
         
+        // Load notifications
+        const settings = (val.notificationSettings as any) || {}
+        notificationTypes.forEach(t => {
+          // Default to true if undefined
+          notifications.value[t.key] = settings[t.key] !== false
+        })
+
         // Use setTimeout to ensure the watch on status doesn't fire for this change if it's eager
         // or nextTick
         setTimeout(() => { isSyncing.value = false }, 0)
@@ -42,6 +58,19 @@
     },
     { immediate: true }
   )
+
+  watch(notifications, async (newVal) => {
+    if (isSyncing.value) return
+    try {
+      await $fetch('/api/put/volunteers/bySession/notifications', {
+        method: 'PUT',
+        body: { notifications: newVal },
+      })
+      toast.add({ title: 'Saved', description: 'Preferences updated', color: 'success' })
+    } catch (err) {
+      toast.add({ title: 'Error', description: 'Failed to update preferences', color: 'error' })
+    }
+  }, { deep: true })
 
   watch(status, async (newVal, oldVal) => {
     if (isSyncing.value) return
@@ -145,6 +174,34 @@
             <div>
               <p class="text-sm text-gray-500 mb-1">Status</p>
               <USelect v-model="status" :items="statusOptions" />
+            </div>
+          </div>
+        </UCard>
+      </div>
+
+      <!-- Notification Preferences -->
+      <div class="lg:col-span-2">
+        <UCard>
+          <template #header>
+            <h2 class="font-bold">Notification Preferences</h2>
+          </template>
+          <p class="mb-6 text-sm text-gray-500">
+            Choose which email notifications you would like to receive.
+          </p>
+
+          <div class="space-y-4">
+            <div
+              v-for="type in notificationTypes"
+              :key="type.key"
+              class="flex items-center justify-between"
+            >
+              <div>
+                <p class="font-medium">{{ type.label }}</p>
+                <p class="text-xs text-gray-500">
+                  Receive email when {{ type.label.toLowerCase() }}
+                </p>
+              </div>
+              <USwitch v-model="notifications[type.key]" />
             </div>
           </div>
         </UCard>

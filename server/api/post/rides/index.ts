@@ -1,5 +1,5 @@
 import { prisma } from '../../../utils/prisma'
-import { sendEmail } from '../../../utils/email'
+import { broadcastNotification } from '../../../utils/notification'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -53,37 +53,19 @@ export default defineEventHandler(async (event) => {
   })
 
   // Notify all volunteers
-  const volunteers = await prisma.volunteer.findMany({
-    include: { user: true },
-    where: { status: 'AVAILABLE' } // Optional: only notify available volunteers
+  const formattedTime = new Date(body.scheduledTime).toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    dateStyle: 'full',
+    timeStyle: 'short',
   })
 
-  const emailPromises = volunteers.map(volunteer => {
-    if (volunteer.user.email) {
-      const formattedTime = new Date(body.scheduledTime).toLocaleString('en-US', {
-        timeZone: 'America/Chicago',
-        dateStyle: 'full',
-        timeStyle: 'short',
-      })
-      const dashboardUrl = process.env.BETTER_AUTH_URL || ''
-
-      return sendEmail(
-        volunteer.user.email,
-        'New Ride Available',
-        `
-          <h1>New Ride Available</h1>
-          <p>A new ride has been posted.</p>
-          <p><strong>From:</strong> ${pickupDisplay}</p>
-          <p><strong>To:</strong> ${dropoffDisplay}</p>
-          <p><strong>Time:</strong> ${formattedTime}</p>
-          <p><a href="${dashboardUrl}/rides">Login to the dashboard to sign up.</a></p>
-        `
-      )
-    }
+  await broadcastNotification('RIDE_CREATED', {
+    pickup: pickupDisplay,
+    dropoff: dropoffDisplay,
+    date: formattedTime.split(',')[0], // Approximate date
+    time: formattedTime,
+    link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
   })
-
-  // We don't await this to keep the response fast, or we can use Promise.allSettled
-  Promise.allSettled(emailPromises).catch(console.error)
 
   return ride
 })

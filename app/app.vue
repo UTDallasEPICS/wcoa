@@ -35,6 +35,11 @@
           to: '/people',
           icon: 'i-lucide-users',
         },
+        {
+          label: 'Notifications',
+          to: '/admin/notifications',
+          icon: 'i-lucide-bell',
+        },
       ]
     }
 
