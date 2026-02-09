@@ -13,7 +13,12 @@
   const { data: volunteers } = await useFetch('/api/get/volunteers')
 
   const search = ref('')
-  const sort = ref('asc') // Default sort: Soonest first
+  const savedSort = useCookie<string>('ride-sort', { default: () => 'desc' })
+  const sort = ref(savedSort.value)
+
+  watch(sort, (newVal) => {
+    savedSort.value = newVal
+  })
 
   // Persisted State
   const savedActiveFilters = useCookie<{ label: string; value: string }[]>('ride-active-filters', {
