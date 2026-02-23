@@ -26,15 +26,24 @@
   })
   const savedExcludedFilters = useCookie<{ label: string; value: string }[]>(
     'ride-excluded-filters',
-    { default: () => [{ label: 'Completed', value: 'status:COMPLETED' }, { label: 'Cancelled', value: 'status:CANCELLED' }] } // Default exclude
+    {
+      default: () => [
+        { label: 'Completed', value: 'status:COMPLETED' },
+        { label: 'Cancelled', value: 'status:CANCELLED' },
+      ],
+    } // Default exclude
   )
 
   const activeFilters = ref<{ label: string; value: string }[]>(savedActiveFilters.value)
   const excludedFilters = ref<{ label: string; value: string }[]>(savedExcludedFilters.value)
 
   // Use watch to refetch when sort changes
-  const { data: rides, status, refresh: refreshRides } = await useFetch('/api/get/rides', {
-    query: { sort }
+  const {
+    data: rides,
+    status,
+    refresh: refreshRides,
+  } = await useFetch('/api/get/rides', {
+    query: { sort },
   })
 
   // Sync state back to cookies
@@ -82,6 +91,7 @@
     pickup: addressSchema,
     dropoff: addressSchema,
     scheduledTime: z.string().min(1, 'Date is required'),
+    pickupTime: z.string().optional(),
     notes: z.string().optional(),
     volunteerId: z.any().optional(),
   })
@@ -102,6 +112,7 @@
       zip: '',
     },
     scheduledTime: '',
+    pickupTime: '',
     notes: '',
     volunteerId: undefined as any,
   })
@@ -109,25 +120,21 @@
   // --- Autocomplete Logic ---
   const pickupSearch = ref('')
   const dropoffSearch = ref('')
-  
+
   const { data: addresses } = await useFetch('/api/get/addresses')
 
   const pickupOptions = computed(() => {
     if (!pickupSearch.value || !addresses.value) return []
     const q = pickupSearch.value.toLowerCase()
-    return addresses.value
-      .filter((a: any) => a.label.toLowerCase().includes(q))
-      .slice(0, 5)
+    return addresses.value.filter((a: any) => a.label.toLowerCase().includes(q)).slice(0, 5)
   })
 
   const dropoffOptions = computed(() => {
     if (!dropoffSearch.value || !addresses.value) return []
     const q = dropoffSearch.value.toLowerCase()
-    return addresses.value
-      .filter((a: any) => a.label.toLowerCase().includes(q))
-      .slice(0, 5)
+    return addresses.value.filter((a: any) => a.label.toLowerCase().includes(q)).slice(0, 5)
   })
-  
+
   const volunteerOptions = computed(() => {
     if (!volunteers.value) return []
     const list = volunteers.value.map((v: any) => ({
@@ -147,7 +154,7 @@
           street: client.homeAddress.street,
           city: client.homeAddress.city,
           state: client.homeAddress.state,
-          zip: client.homeAddress.zip
+          zip: client.homeAddress.zip,
         })
       }
     }
@@ -158,7 +165,7 @@
       street: opt.address.street,
       city: opt.address.city,
       state: opt.address.state,
-      zip: opt.address.zip
+      zip: opt.address.zip,
     })
     pickupSearch.value = ''
   }
@@ -168,7 +175,7 @@
       street: opt.address.street,
       city: opt.address.city,
       state: opt.address.state,
-      zip: opt.address.zip
+      zip: opt.address.zip,
     })
     dropoffSearch.value = ''
   }
@@ -312,11 +319,15 @@
     try {
       // Convert local datetime-local string to ISO string (UTC)
       const scheduledTimeISO = new Date(event.data.scheduledTime).toISOString()
-      
+      const pickupTimeISO = event.data.pickupTime
+        ? new Date(event.data.pickupTime).toISOString()
+        : undefined
+
       // Handle volunteerId being an object or string
-      const vId = typeof event.data.volunteerId === 'object' 
-        ? event.data.volunteerId.value 
-        : event.data.volunteerId
+      const vId =
+        typeof event.data.volunteerId === 'object'
+          ? event.data.volunteerId.value
+          : event.data.volunteerId
 
       await $fetch('/api/post/rides', {
         method: 'POST',
@@ -324,6 +335,7 @@
           ...event.data,
           volunteerId: vId,
           scheduledTime: scheduledTimeISO,
+          pickupTime: pickupTimeISO,
         },
       })
       isCreateModalOpen.value = false
@@ -334,6 +346,7 @@
         pickupDisplay: '',
         dropoffDisplay: '',
         scheduledTime: '',
+        pickupTime: '',
         notes: '',
         volunteerId: undefined,
       })
@@ -364,7 +377,10 @@
       />
       <USelect
         v-model="sort"
-        :items="[{ label: 'Oldest First', value: 'asc' }, { label: 'Newest First', value: 'desc' }]"
+        :items="[
+          { label: 'Oldest First', value: 'asc' },
+          { label: 'Newest First', value: 'desc' },
+        ]"
         class="w-36"
       />
       <USelectMenu
@@ -487,7 +503,11 @@
               </div>
 
               <UFormField label="Street" name="dropoff.street">
-                <UInput v-model="state.dropoff.street" placeholder="Street Address" class="w-full" />
+                <UInput
+                  v-model="state.dropoff.street"
+                  placeholder="Street Address"
+                  class="w-full"
+                />
               </UFormField>
               <div class="grid grid-cols-3 gap-2">
                 <UFormField label="City" name="dropoff.city"
@@ -513,9 +533,15 @@
               />
             </UFormField>
 
-            <UFormField label="Scheduled Time" name="scheduledTime">
-              <UInput v-model="state.scheduledTime" type="datetime-local" class="w-full" />
-            </UFormField>
+            <div class="grid grid-cols-2 gap-4">
+              <UFormField label="Appointment Time" name="scheduledTime">
+                <UInput v-model="state.scheduledTime" type="datetime-local" class="w-full" />
+              </UFormField>
+
+              <UFormField label="Pick Up Time (Optional)" name="pickupTime">
+                <UInput v-model="state.pickupTime" type="datetime-local" class="w-full" />
+              </UFormField>
+            </div>
 
             <UFormField label="Notes" name="notes">
               <UTextarea

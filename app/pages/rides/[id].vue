@@ -25,6 +25,7 @@
     pickupDisplay: z.string().min(1, 'Pickup address is required'),
     dropoffDisplay: z.string().min(1, 'Dropoff address is required'),
     scheduledTime: z.string().min(1, 'Scheduled time is required'),
+    pickupTime: z.string().optional(),
     notes: z.string().optional(),
     totalRideTime: z.number().optional(),
     volunteerId: z.any().optional(),
@@ -34,6 +35,7 @@
     pickupDisplay: '',
     dropoffDisplay: '',
     scheduledTime: '',
+    pickupTime: '',
     notes: '',
     totalRideTime: 0,
     volunteerId: undefined as any,
@@ -53,15 +55,23 @@
       editState.scheduledTime = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
         .toISOString()
         .slice(0, 16)
+
+      if (ride.value.pickupTime) {
+        const pDate = new Date(ride.value.pickupTime)
+        editState.pickupTime = new Date(pDate.getTime() - pDate.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)
+      } else {
+        editState.pickupTime = ''
+      }
+
       editState.notes = ride.value.notes || ''
       editState.totalRideTime = ride.value.totalRideTime || 0
-      
+
       // Handle volunteer object binding for USelectMenu
       if (ride.value.volunteerId) {
         const found = volunteers.value?.find((v: any) => v.id === ride.value.volunteerId)
-        editState.volunteerId = found 
-          ? { label: found.user.name, value: found.id } 
-          : undefined
+        editState.volunteerId = found ? { label: found.user.name, value: found.id } : undefined
       } else {
         editState.volunteerId = undefined // or { label: 'Unassigned', value: '' } if preferred
       }
@@ -72,18 +82,23 @@
     try {
       // Convert local datetime-local string to ISO string (UTC)
       const scheduledTimeISO = new Date(event.data.scheduledTime).toISOString()
-      
+      const pickupTimeISO = event.data.pickupTime
+        ? new Date(event.data.pickupTime).toISOString()
+        : null
+
       // Normalize volunteerId
-      const vId = typeof event.data.volunteerId === 'object' 
-        ? event.data.volunteerId.value 
-        : event.data.volunteerId
+      const vId =
+        typeof event.data.volunteerId === 'object'
+          ? event.data.volunteerId.value
+          : event.data.volunteerId
 
       await $fetch(`/api/put/rides/${id}`, {
         method: 'PUT',
         body: {
           ...event.data,
           volunteerId: vId,
-          scheduledTime: scheduledTimeISO
+          scheduledTime: scheduledTimeISO,
+          pickupTime: pickupTimeISO,
         },
       })
       toast.add({ title: 'Success', description: 'Ride updated successfully', color: 'success' })
@@ -98,9 +113,9 @@
     try {
       await $fetch(`/api/put/rides/${id}`, {
         method: 'PUT',
-        body: { 
+        body: {
           status: 'COMPLETED',
-          totalRideTime: event.data.totalRideTime
+          totalRideTime: event.data.totalRideTime,
         },
       })
       toast.add({ title: 'Success', description: 'Ride marked as completed', color: 'success' })
@@ -199,14 +214,7 @@
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-xl font-bold">Ride Information</h2>
-              <UBadge
-                :color="
-                  ride.status === 'COMPLETED'
-                    ? 'success'
-                    : 'info'
-                "
-                variant="subtle"
-              >
+              <UBadge :color="ride.status === 'COMPLETED' ? 'success' : 'info'" variant="subtle">
                 {{ ride.status }}
               </UBadge>
             </div>
@@ -214,9 +222,16 @@
 
           <div class="space-y-4">
             <div>
-              <p class="text-sm text-gray-500">Scheduled Time</p>
+              <p class="text-sm text-gray-500">Appointment Time</p>
               <p class="font-medium">
                 {{ new Date(ride.scheduledTime).toLocaleString() }}
+              </p>
+            </div>
+
+            <div v-if="ride.pickupTime">
+              <p class="text-error text-sm text-gray-500">Pick Up Time</p>
+              <p class="text-error font-bold">
+                {{ new Date(ride.pickupTime).toLocaleString() }}
               </p>
             </div>
 
@@ -233,7 +248,9 @@
                 {{ ride.volunteer?.user?.name }}
               </p>
               <p class="text-gray-400 italic" v-else>No volunteer assigned</p>
-              <p class="text-sm text-gray-500">{{ formatPhoneNumber(ride.volunteer?.user?.phone) }}</p>
+              <p class="text-sm text-gray-500">
+                {{ formatPhoneNumber(ride.volunteer?.user?.phone) }}
+              </p>
             </div>
 
             <div v-if="ride.status === 'COMPLETED' || ride.totalRideTime">
@@ -323,7 +340,10 @@
               </div>
             </div>
 
-            <div v-if="estimate && !estimate.error" class="flex gap-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div
+              v-if="estimate && !estimate.error"
+              class="flex gap-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50"
+            >
               <div>
                 <p class="text-sm text-gray-500">Est. Duration</p>
                 <p class="font-medium">{{ estimate.duration }}</p>
@@ -380,16 +400,41 @@
               />
             </UFormField>
 
-            <UFormField label="Scheduled Time" name="scheduledTime">
-              <UInput v-model="editState.scheduledTime" type="datetime-local" class="w-full" :disabled="!isAdmin" />
-            </UFormField>
+            <div class="grid grid-cols-2 gap-4">
+              <UFormField label="Appointment Time" name="scheduledTime">
+                <UInput
+                  v-model="editState.scheduledTime"
+                  type="datetime-local"
+                  class="w-full"
+                  :disabled="!isAdmin"
+                />
+              </UFormField>
+
+              <UFormField label="Pick Up Time (Optional)" name="pickupTime">
+                <UInput
+                  v-model="editState.pickupTime"
+                  type="datetime-local"
+                  class="w-full"
+                  :disabled="!isAdmin"
+                />
+              </UFormField>
+            </div>
 
             <UFormField label="Notes" name="notes">
               <UTextarea v-model="editState.notes" class="w-full" :disabled="!isAdmin" />
             </UFormField>
 
-            <UFormField label="Total Ride Time (Hours)" name="totalRideTime" v-if="ride?.status === 'COMPLETED' || isAdmin">
-              <UInput v-model.number="editState.totalRideTime" type="number" step="0.1" class="w-full" />
+            <UFormField
+              label="Total Ride Time (Hours)"
+              name="totalRideTime"
+              v-if="ride?.status === 'COMPLETED' || isAdmin"
+            >
+              <UInput
+                v-model.number="editState.totalRideTime"
+                type="number"
+                step="0.1"
+                class="w-full"
+              />
             </UFormField>
 
             <div class="flex justify-end gap-2 pt-4">
@@ -411,7 +456,11 @@
       <template #content>
         <div class="space-y-4 p-4">
           <UForm
-            :schema="z.object({ totalRideTime: z.number().min(0.1, 'Duration must be at least 0.1 hours') })"
+            :schema="
+              z.object({
+                totalRideTime: z.number().min(0.1, 'Duration must be at least 0.1 hours'),
+              })
+            "
             :state="completeState"
             @submit="handleComplete"
           >
@@ -419,7 +468,12 @@
               Please enter the total time spent on this ride (including pickup and dropoff).
             </p>
             <UFormField label="Total Duration (Hours)" name="totalRideTime">
-              <UInput v-model.number="completeState.totalRideTime" type="number" step="0.1" class="w-full" />
+              <UInput
+                v-model.number="completeState.totalRideTime"
+                type="number"
+                step="0.1"
+                class="w-full"
+              />
             </UFormField>
 
             <div class="flex justify-end gap-2 pt-4">

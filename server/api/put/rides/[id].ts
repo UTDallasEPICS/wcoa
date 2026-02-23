@@ -18,12 +18,12 @@ export default defineEventHandler(async (event) => {
     where: { id },
     include: {
       volunteer: {
-        include: { user: true }
+        include: { user: true },
       },
       client: {
-        include: { user: true }
-      }
-    }
+        include: { user: true },
+      },
+    },
   })
 
   if (!existingRide) {
@@ -36,6 +36,12 @@ export default defineEventHandler(async (event) => {
   const updateData: any = { ...body }
   if (updateData.scheduledTime) {
     updateData.scheduledTime = new Date(updateData.scheduledTime)
+  }
+  if (updateData.pickupTime) {
+    updateData.pickupTime = new Date(updateData.pickupTime)
+  } else if (updateData.pickupTime === null) {
+    // allow clearing the pickup time
+    updateData.pickupTime = null
   }
 
   // Handle volunteer assignment/unassignment
@@ -52,12 +58,12 @@ export default defineEventHandler(async (event) => {
     data: updateData,
     include: {
       volunteer: {
-        include: { user: true }
+        include: { user: true },
       },
       client: {
-        include: { user: true }
-      }
-    }
+        include: { user: true },
+      },
+    },
   })
 
   // Notifications
@@ -69,7 +75,7 @@ export default defineEventHandler(async (event) => {
     date: formattedTime.split(',')[0],
     time: formattedTime,
     link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
-    notes: ride.notes || 'None'
+    notes: ride.notes || 'None',
   }
 
   // 1. RIDE_COMPLETED
@@ -77,32 +83,35 @@ export default defineEventHandler(async (event) => {
     if (ride.volunteer) {
       await sendNotification('RIDE_COMPLETED', ride.volunteer.id, {
         name: ride.volunteer.user.name,
-        ...commonContext
+        ...commonContext,
       })
     }
 
     // Notify Admins (legacy/direct email)
     const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } })
-    const adminEmails = admins.map(admin => admin.email).filter(Boolean)
-    
-    adminEmails.forEach(email => {
-      sendEmail(
-        email,
-        'Ride Completed by Volunteer',
-        `
-          <h1>Ride Completed</h1>
-          <p><strong>Volunteer:</strong> ${ride.volunteer?.user?.name || 'N/A'}</p>
-          <p><strong>Ride Details:</strong></p>
-          <p><strong>From:</strong> ${ride.pickupDisplay}</p>
-          <p><strong>To:</strong> ${ride.dropoffDisplay}</p>
-          <p><strong>Total Time:</strong> ${ride.totalRideTime || 'N/A'} hours</p>
-        `
-      ).catch(console.error)
+    const adminEmails = admins.map((admin) => admin.email).filter(Boolean)
+
+    adminEmails.forEach((email) => {
+      if (email) {
+        sendEmail(
+          email,
+          'Ride Completed by Volunteer',
+          `
+            <h1>Ride Completed</h1>
+            <p><strong>Volunteer:</strong> ${ride.volunteer?.user?.name || 'N/A'}</p>
+            <p><strong>Ride Details:</strong></p>
+            <p><strong>From:</strong> ${ride.pickupDisplay}</p>
+            <p><strong>To:</strong> ${ride.dropoffDisplay}</p>
+            <p><strong>Total Time:</strong> ${ride.totalRideTime || 'N/A'} hours</p>
+          `
+        ).catch(console.error)
+      }
     })
   }
 
   // 2. RIDE_CANCELLED
-  if (body.status === 'CANCELLED' && existingRide.status !== 'CANCELLED') {
+  // (Currently no CANCELLED status in RideStatus enum, handling for future proofing or custom status strings)
+  if (body.status === 'CANCELLED' && (existingRide.status as string) !== 'CANCELLED') {
     // Notify the volunteer who WAS assigned (even if unassigned in this update, though unlikely for cancellation)
     // Assuming volunteer is still attached or was attached in existingRide
     const volunteerToNotify = existingRide.volunteer // Notify the volunteer who was assigned before cancellation
@@ -110,7 +119,7 @@ export default defineEventHandler(async (event) => {
     if (volunteerToNotify) {
       await sendNotification('RIDE_CANCELLED', volunteerToNotify.id, {
         name: volunteerToNotify.user.name,
-        ...commonContext
+        ...commonContext,
       })
     }
   }

@@ -18,7 +18,8 @@ model Ride {
   dropoffAddress   Address? @relation("DropoffRef", fields: [dropoffAddressId], references: [id], onDelete: SetNull)
 
   // Timing & Info
-  scheduledTime DateTime
+  scheduledTime DateTime // Treated as Appointment Time
+  pickupTime    DateTime? // Specific time volunteer should arrive
   totalRideTime Float?   // Actual duration in hours (e.g. 1.5)
   notes         String? // Essential for Admin instructions to Volunteer
 

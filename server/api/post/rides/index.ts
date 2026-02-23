@@ -12,7 +12,12 @@ export default defineEventHandler(async (event) => {
   }
 
   // Helper to find or create address
-  const resolveAddress = async (addr: { street: string; city: string; state: string; zip: string }) => {
+  const resolveAddress = async (addr: {
+    street: string
+    city: string
+    state: string
+    zip: string
+  }) => {
     return await prisma.address.upsert({
       where: {
         street_city_state_zip: {
@@ -46,6 +51,7 @@ export default defineEventHandler(async (event) => {
       pickupAddressId: pickupAddress.id,
       dropoffAddressId: dropoffAddress.id,
       scheduledTime: new Date(body.scheduledTime),
+      pickupTime: body.pickupTime ? new Date(body.pickupTime) : undefined,
       notes: body.notes,
       volunteerId: body.volunteerId ? body.volunteerId : undefined,
       status: body.volunteerId ? 'ASSIGNED' : 'CREATED',
