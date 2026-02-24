@@ -54,9 +54,8 @@ COPY --from=builder /app/.output ./.output
 # This gives us a clean, minimal node_modules with compiled native addons
 COPY --from=prod-deps /app/node_modules ./.output/server/node_modules
 
-# Copy Prisma Client generated artifacts (engine, schema, etc.)
-# Because 'npm install' in prod-deps only installs the library code, not the generated client
-COPY --from=builder /app/node_modules/.prisma ./.output/server/node_modules/.prisma
+# Copy the generated Prisma Client
+COPY --from=builder /app/prisma/generated ./prisma/generated
 
 # Copy prisma schema just in case it's needed for runtime validations or migrations
 COPY --from=builder /app/prisma ./prisma
