@@ -36,7 +36,9 @@ COPY --from=builder /app/.output/server/package.json ./package.json
 
 # Install ONLY production dependencies (no devDependencies, no Nuxt core)
 # This installs better-sqlite3 and builds it natively
-RUN npm install --omit=dev
+# We use --legacy-peer-deps because better-auth 1.4.x has a strict peer dependency on Prisma 5.x
+# but we are using Prisma 7.x which is compatible but strictly version-locked in package.json
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Stage 3: Final Image
 FROM node:22-slim
