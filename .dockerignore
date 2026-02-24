@@ -1,0 +1,11 @@
+node_modules
+.git
+.output
+.nuxt
+.env
+*.db
+*.log
+deploy.tar.gz
+notes
+dist
+.DS_Store
