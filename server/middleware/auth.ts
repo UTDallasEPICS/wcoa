@@ -35,6 +35,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
 
+  // Expose the resolved session to downstream handlers so they can scope data
+  // (issue #3) without re-running the session lookup.
+  event.context.auth = session
+
   const role = (session.user as { role?: string }).role
 
   if (role === 'ADMIN') return
