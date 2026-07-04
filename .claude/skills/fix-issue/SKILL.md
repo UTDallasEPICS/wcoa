@@ -31,6 +31,7 @@ Fix exactly one GitHub issue with verifiable evidence. The issue number is given
 
 ## Constraints
 
+- **Never merge the PR.** Merging `main` deploys to production; the merge decision belongs to the user or the `/issue-loop` orchestrator's gate.
 - One issue per invocation. Resist scope creep — the backlog is interlocking and reviewability matters more than batching.
 - Never read or quote `prod.sql` or `deploy.tar.gz` (real client PII, issue #29).
 - Never commit `.env`, database files, or dumps.
