@@ -6,16 +6,27 @@ import Database from 'better-sqlite3'
 //   VOLUNTEER: bob@example.com, alice@example.com
 //   CLIENT:    martha@example.com, george@example.com, sarah@example.com
 
+const sessionCache = new Map<string, string>()
+let ipCounter = 0
+
 /**
  * Logs in through the real better-auth email-OTP flow without SMTP.
  * The app swallows email-send failures, but better-auth stores the OTP in the
  * `verification` table first — so we request an OTP, read it straight from the
  * test database, and complete sign-in. Returns a Cookie header value.
+ *
+ * Sessions are cached per email, and each login uses a unique X-Forwarded-For
+ * so better-auth's per-IP rate limiter (active in production builds) doesn't
+ * throttle suites that log in repeatedly.
  */
 export async function loginAs(email: string): Promise<string> {
+  const cached = sessionCache.get(email)
+  if (cached) return cached
+
+  const fakeIp = `10.99.0.${++ipCounter}`
   const sendRes = await appFetch('/api/auth/email-otp/send-verification-otp', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': fakeIp },
     body: JSON.stringify({ email, type: 'sign-in' }),
   })
   if (!sendRes.ok) {
@@ -26,7 +37,7 @@ export async function loginAs(email: string): Promise<string> {
 
   const signInRes = await appFetch('/api/auth/sign-in/email-otp', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': fakeIp },
     body: JSON.stringify({ email, otp }),
   })
   if (!signInRes.ok) {
@@ -38,7 +49,9 @@ export async function loginAs(email: string): Promise<string> {
     throw new Error(`sign-in for ${email} returned no Set-Cookie header`)
   }
   // "name=value; Path=/; HttpOnly" -> "name=value", joined for a Cookie header
-  return setCookies.map((c) => c.split(';')[0]).join('; ')
+  const cookie = setCookies.map((c) => c.split(';')[0]).join('; ')
+  sessionCache.set(email, cookie)
+  return cookie
 }
 
 function readLatestOtp(email: string): string {

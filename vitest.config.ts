@@ -14,6 +14,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: `file:${testDb}`,
       BETTER_AUTH_SECRET: 'test-secret-not-for-production',
+      DISABLE_RATE_LIMIT: 'true',
     },
     testTimeout: 30_000,
     // First hook builds the Nuxt app; allow plenty of time.
