@@ -19,6 +19,11 @@ export const auth = betterAuth({
     provider: 'sqlite',
   }),
   trustedOrigins: ['http://localhost:3000', 'http://192.168.4.240:3000'],
+  // Disabled only in the e2e suite (production build ⇒ rate limiting on by
+  // default, which throttles a test that logs in many times from one IP).
+  rateLimit: {
+    enabled: process.env.DISABLE_RATE_LIMIT !== 'true',
+  },
   user: {
     additionalFields: {
       role: {
@@ -38,18 +43,16 @@ export const auth = betterAuth({
       if (ctx.path !== '/email-otp/send-verification-otp') {
         return
       }
-      try {
-        const user = await $fetch(`/api/get/users/byEmail/${ctx.body?.email}`)
-        if (!user) {
-          throw new APIError('BAD_REQUEST', {
-            message: 'Contact admin to add your user to the system first',
-          })
-        }
-      } catch (err) {
-        if (err instanceof APIError) {
-          throw err
-        }
-        console.log(`Error fetching user using email: ${err}`)
+      // Query the database directly rather than looping back through the HTTP
+      // API (avoids self-request latency/deadlocks, and the API is now behind
+      // auth middleware which would reject this pre-session call). See #20.
+      const email = ctx.body?.email
+      if (!email) return
+      const user = await prisma.user.findUnique({ where: { email } })
+      if (!user) {
+        throw new APIError('BAD_REQUEST', {
+          message: 'Contact admin to add your user to the system first',
+        })
       }
     }),
   },

@@ -8,8 +8,9 @@ await setup({
 })
 
 describe('test harness smoke test', () => {
-  it('boots the app and serves seeded data', async () => {
-    const rides = await $fetch('/api/get/rides')
+  it('boots the app and serves seeded data (authenticated)', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+    const rides = await $fetch('/api/get/rides', { headers: { cookie } })
     expect(Array.isArray(rides)).toBe(true)
     expect(rides.length).toBeGreaterThanOrEqual(9)
   })
