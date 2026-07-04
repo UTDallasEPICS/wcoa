@@ -7,7 +7,9 @@
     "dev": "nuxt dev --host",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "prisma:reset": "prisma migrate dev --name init && prisma generate && prisma migrate reset -f && prisma db seed"
+    "prisma:reset": "prisma migrate dev --name init && prisma generate && prisma migrate reset -f && prisma db seed",
+    "test": "nuxt prepare && vitest run",
+    "test:watch": "nuxt prepare && vitest"
   },
   "dependencies": {
     "@nuxt/ui": "^4.3.0",
@@ -25,12 +27,14 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@nuxt/test-utils": "^4.0.3",
     "@tailwindcss/vite": "^4.1.18",
     "@types/better-sqlite3": "^7.6.13",
     "prettier": "3.7.4",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "^7.2.0",
     "tailwindcss": "^4.1.18",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.9"
   }
 }
