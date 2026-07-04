@@ -1,8 +1,12 @@
 import { prisma } from '../../../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
+  // Dashboard metrics expose client names (PII) and are admin-only (issue #41).
+  // Consumer: index.vue, the admin dashboard (volunteers are redirected, #4).
+  requireAdmin(event)
+
   const query = getQuery(event)
-  
+
   let startFilter: Date
   let endFilter: Date
 
