@@ -1,3 +1,4 @@
+import { Prisma } from '../../../../../prisma/generated/client'
 import { prisma } from '../../../../utils/prisma'
 import { auth } from '../../../../utils/auth'
 import { sendEmail } from '../../../../utils/email'
@@ -71,14 +72,35 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 3. Assign Volunteer
-  const updatedRide = await prisma.ride.update({
-    where: { id },
-    data: {
-      volunteerId: volunteer.id,
-      status: 'ASSIGNED'
+  // 3. Assign Volunteer (atomic — issue #12)
+  // The pre-checks above give good error messages, but they are a read
+  // separate from the write below: two volunteers can both pass the in-memory
+  // `ride.status === 'CREATED'` check and then race to update, with the second
+  // silently overwriting the first (TOCTOU). Put the precondition inside the
+  // WHERE clause so the assignment only succeeds while the ride is still
+  // unclaimed. If it was taken in between, Prisma throws P2025 (record to
+  // update not found) and we reject cleanly instead of overwriting.
+  let updatedRide
+  try {
+    updatedRide = await prisma.ride.update({
+      where: { id, status: 'CREATED', volunteerId: null },
+      data: {
+        volunteerId: volunteer.id,
+        status: 'ASSIGNED'
+      }
+    })
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2025'
+    ) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'Ride is no longer available',
+      })
     }
-  })
+    throw err
+  }
 
   // 4. Notifications
   const admins = await prisma.user.findMany({

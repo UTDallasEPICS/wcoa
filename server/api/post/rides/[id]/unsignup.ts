@@ -1,3 +1,4 @@
+import { Prisma } from '../../../../../prisma/generated/client'
 import { prisma } from '../../../../utils/prisma'
 import { auth } from '../../../../utils/auth'
 import { sendEmail } from '../../../../utils/email'
@@ -63,14 +64,32 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 3. Unassign Volunteer
-  const updatedRide = await prisma.ride.update({
-    where: { id },
-    data: {
-      volunteerId: null,
-      status: 'CREATED'
+  // 3. Unassign Volunteer (atomic — issue #12, same check-then-act shape)
+  // Guard the update on the state we validated above so a concurrent unsignup
+  // (or a reassignment) can't cause a redundant/incorrect unassign. If the ride
+  // is no longer this volunteer's ASSIGNED ride, Prisma throws P2025 and we
+  // reject cleanly.
+  let updatedRide
+  try {
+    updatedRide = await prisma.ride.update({
+      where: { id, status: 'ASSIGNED', volunteerId: volunteer.id },
+      data: {
+        volunteerId: null,
+        status: 'CREATED'
+      }
+    })
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2025'
+    ) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'Ride is no longer available',
+      })
     }
-  })
+    throw err
+  }
 
   // 4. Notifications
   const admins = await prisma.user.findMany({
