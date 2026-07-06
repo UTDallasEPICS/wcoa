@@ -1,10 +1,30 @@
+import { z } from 'zod'
 import { prisma } from '../../../utils/prisma'
 import { sendEmail } from '../../../utils/email'
 import { sendNotification } from '../../../utils/notification'
+import { readValidatedBody } from '../../../utils/validation'
+
+// Whitelist of the ONLY fields an update may set (issue #31). Anything else
+// (clientId, createdAt, address ids, unknown keys, …) is rejected with a 400
+// rather than mass-assigned into prisma.ride.update. All fields are optional so
+// partial updates (e.g. the "mark complete" flow sending only status +
+// totalRideTime) still work; unknown keys are rejected via .strict().
+const updateRideSchema = z
+  .object({
+    status: z.enum(['CREATED', 'ASSIGNED', 'COMPLETED']).optional(),
+    // Empty string means "unassign"; handled below into null.
+    volunteerId: z.string().nullable().optional(),
+    scheduledTime: z.string().min(1).optional(),
+    pickupTime: z.string().min(1).nullable().optional(),
+    totalRideTime: z.number().optional(),
+    notes: z.string().nullable().optional(),
+    pickupDisplay: z.string().min(1).optional(),
+    dropoffDisplay: z.string().min(1).optional(),
+  })
+  .strict()
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
-  const body = await readBody(event)
 
   if (!id) {
     throw createError({
@@ -12,6 +32,8 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'ID is required',
     })
   }
+
+  const body = await readValidatedBody(event, updateRideSchema)
 
   // Fetch existing ride to check previous state
   const existingRide = await prisma.ride.findUnique({
@@ -33,24 +55,36 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const updateData: any = { ...body }
-  if (updateData.scheduledTime) {
-    updateData.scheduledTime = new Date(updateData.scheduledTime)
+  // Build the Prisma update payload only from validated, whitelisted fields.
+  const updateData: {
+    status?: 'CREATED' | 'ASSIGNED' | 'COMPLETED'
+    volunteerId?: string | null
+    scheduledTime?: Date
+    pickupTime?: Date | null
+    totalRideTime?: number
+    notes?: string | null
+    pickupDisplay?: string
+    dropoffDisplay?: string
+  } = {}
+
+  if (body.status !== undefined) updateData.status = body.status
+  if (body.totalRideTime !== undefined) updateData.totalRideTime = body.totalRideTime
+  if (body.notes !== undefined) updateData.notes = body.notes
+  if (body.pickupDisplay !== undefined) updateData.pickupDisplay = body.pickupDisplay
+  if (body.dropoffDisplay !== undefined) updateData.dropoffDisplay = body.dropoffDisplay
+
+  if (body.scheduledTime !== undefined) {
+    updateData.scheduledTime = new Date(body.scheduledTime)
   }
-  if (updateData.pickupTime) {
-    updateData.pickupTime = new Date(updateData.pickupTime)
-  } else if (updateData.pickupTime === null) {
-    // allow clearing the pickup time
-    updateData.pickupTime = null
+  if (body.pickupTime !== undefined) {
+    // null (or empty) clears the pickup time; a string sets it.
+    updateData.pickupTime = body.pickupTime ? new Date(body.pickupTime) : null
   }
 
-  // Handle volunteer assignment/unassignment
+  // Handle volunteer assignment/unassignment (empty string => unassign)
   if (body.volunteerId !== undefined) {
-    if (body.volunteerId && body.volunteerId.trim() !== '') {
-      updateData.volunteerId = body.volunteerId
-    } else {
-      updateData.volunteerId = null
-    }
+    updateData.volunteerId =
+      body.volunteerId && body.volunteerId.trim() !== '' ? body.volunteerId : null
   }
 
   const ride = await prisma.ride.update({
@@ -111,7 +145,7 @@ export default defineEventHandler(async (event) => {
 
   // 2. RIDE_CANCELLED
   // (Currently no CANCELLED status in RideStatus enum, handling for future proofing or custom status strings)
-  if (body.status === 'CANCELLED' && (existingRide.status as string) !== 'CANCELLED') {
+  if ((body.status as string) === 'CANCELLED' && (existingRide.status as string) !== 'CANCELLED') {
     // Notify the volunteer who WAS assigned (even if unassigned in this update, though unlikely for cancellation)
     // Assuming volunteer is still attached or was attached in existingRide
     const volunteerToNotify = existingRide.volunteer // Notify the volunteer who was assigned before cancellation
