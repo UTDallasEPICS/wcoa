@@ -1,11 +1,9 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { $fetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { $fetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Issue #8: deleting a Client/Volunteer profile used to leave the parent User
 // row behind — an orphaned User with role CLIENT/VOLUNTEER but no profile,

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { fetch as appFetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { fetch as appFetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Issue #4: the global route middleware must guard internal pages per role,
 // not only special-case VOLUNTEER. A logged-in CLIENT (or any unmapped role)

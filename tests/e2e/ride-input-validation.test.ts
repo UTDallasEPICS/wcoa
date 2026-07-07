@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { $fetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { $fetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Regression coverage for issue #31: PUT /api/put/rides/[id] spread the raw
 // request body straight into prisma.ride.update, allowing mass assignment of

@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { $fetch, fetch as appFetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { $fetch, fetch as appFetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Issue #23: deleting a Client who has rides used to throw P2003 (the
 // ride->client FK is ON DELETE RESTRICT) and return a 500, so the admin UI
