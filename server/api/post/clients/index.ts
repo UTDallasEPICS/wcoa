@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       data: {
         name: body.name,
         email: body.email || null,
-        phone: body.phone,
+        phone: emptyToNull(body.phone),
         role: 'CLIENT'
       }
     })
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
       where: { id: user.id },
       data: {
         name: body.name,
-        phone: body.phone,
+        phone: emptyToNull(body.phone),
         // Don't downgrade ADMIN/VOLUNTEER
       }
     })
