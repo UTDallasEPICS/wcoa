@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       data: {
         name: body.name,
         email: body.email,
-        phone: body.phone,
+        phone: emptyToNull(body.phone),
         role: 'VOLUNTEER'
       }
     })
@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
       where: { id: user.id },
       data: {
         name: body.name,
-        phone: body.phone, // Update phone
+        phone: emptyToNull(body.phone), // Update phone
         role: user.role === 'CLIENT' ? 'VOLUNTEER' : user.role // Upgrade CLIENT to VOLUNTEER
       }
     })

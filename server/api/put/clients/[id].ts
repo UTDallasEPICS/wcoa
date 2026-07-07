@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
         data: {
           name: body.name,
           email: body.email || null,
-          phone: body.phone,
+          phone: emptyToNull(body.phone),
         },
       })
     }
