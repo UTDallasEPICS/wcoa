@@ -89,9 +89,15 @@ export default defineEventHandler(async (event) => {
     // Issue #7: unassigning a volunteer must also return the ride to the
     // available pool, otherwise it is left ASSIGNED with no volunteer — a stuck
     // state. Mirror the unsignup endpoint (volunteerId: null, status: 'CREATED').
-    // Only auto-set CREATED when the caller didn't explicitly request a status
-    // (e.g. a deliberate COMPLETED must be respected).
-    if (updateData.volunteerId === null && body.status === undefined) {
+    // Only auto-set CREATED when (a) the caller didn't explicitly request a
+    // status (a deliberate COMPLETED must be respected), and (b) the ride was
+    // actually ASSIGNED — never silently un-complete a COMPLETED ride, which
+    // would drop it from completion metrics while leaving its totalRideTime.
+    if (
+      updateData.volunteerId === null &&
+      body.status === undefined &&
+      existingRide.status === 'ASSIGNED'
+    ) {
       updateData.status = 'CREATED'
     }
   }

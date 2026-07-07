@@ -89,6 +89,26 @@ describe('PUT /api/put/rides/[id] — unassigning a volunteer (issue #7)', () =>
     expect(updated.status).toBe('COMPLETED')
   })
 
+  it('does NOT un-complete a COMPLETED ride when the volunteer is cleared', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+    const assigned = await freshAssignedRide(cookie)
+
+    // Complete the ride (as the mark-complete flow would).
+    const completed = await put(cookie, assigned.id, {
+      status: 'COMPLETED',
+      totalRideTime: 1.5,
+    })
+    expect(completed.status).toBe('COMPLETED')
+
+    // Clearing the volunteer with no explicit status must NOT silently flip a
+    // COMPLETED ride back to CREATED — that would drop it from completion
+    // metrics while leaving its totalRideTime (issue #7 hardening).
+    const updated = await put(cookie, assigned.id, { volunteerId: '' })
+
+    expect(updated.volunteerId).toBeNull()
+    expect(updated.status).toBe('COMPLETED')
+  })
+
   it('leaves status untouched on an edit that does not change the volunteer', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
     const assigned = await freshAssignedRide(cookie)
