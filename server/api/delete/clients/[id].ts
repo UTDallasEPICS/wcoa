@@ -25,16 +25,36 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Issue #8: deleting only the Client profile left an orphaned User (role
+  // CLIENT, no profile) that crashes frontend queries reading user.client.id.
+  // Delete the underlying User instead — Client.user is onDelete: Cascade, so
+  // this removes the client row too, leaving no orphan. (Roles are singular in
+  // this app, so a User won't also hold a volunteer profile.)
+  const client = await prisma.client.findUnique({
+    where: { id },
+    select: { userId: true },
+  })
+  if (!client) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Client not found',
+    })
+  }
+
   try {
-    return await prisma.client.delete({
-      where: { id },
+    return await prisma.user.delete({
+      where: { id: client.userId },
     })
   } catch (err) {
     // Race-safe fallback: a ride could be created between the count and the
-    // delete. Treat the FK violation as the same 409 block, never a 500.
+    // delete. We now delete the User, whose cascade to the client row is what
+    // trips the ride->client RESTRICT FK. Empirically (better-sqlite3 adapter)
+    // this surfaces as P2003; we also accept P2014 (required-relation
+    // violation) defensively so a driver quirk can't leak a 500. Treat both as
+    // the same 409 block.
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === 'P2003'
+      (err.code === 'P2003' || err.code === 'P2014')
     ) {
       throw createError({
         statusCode: 409,
