@@ -7,27 +7,31 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event)
 
-  let startFilter: Date
-  let endFilter: Date
+  let scheduledTime: { gte: Date; lt: Date }
 
-  if (query.startDate || query.endDate) {
-    startFilter = query.startDate ? new Date(String(query.startDate)) : new Date(0) // Beginning of time if not set
-    endFilter = query.endDate ? new Date(String(query.endDate)) : new Date(8640000000000000) // Max date if not set
+  const range = parseDateRange(query.startDate, query.endDate)
+  if (range) {
+    // Explicit date(s): the shared helper makes endDate inclusive of the whole
+    // day (issue #18 — previously `lt: endDate` dropped the entire end day).
+    // Open bounds when only one side is given match the prior behavior.
+    scheduledTime = {
+      gte: range.gte ?? new Date(0), // Beginning of time if start not set
+      lt: range.lt ?? new Date(8640000000000000), // Max date if end not set
+    }
   } else {
     // Default to Year to Date
     const currentYear = new Date().getFullYear()
-    startFilter = new Date(currentYear, 0, 1)
-    endFilter = new Date(currentYear + 1, 0, 1)
+    scheduledTime = {
+      gte: new Date(currentYear, 0, 1),
+      lt: new Date(currentYear + 1, 0, 1),
+    }
   }
 
   const topRidersRaw = await prisma.ride.groupBy({
     by: ['clientId'],
     where: {
       status: 'COMPLETED',
-      scheduledTime: {
-        gte: startFilter,
-        lt: endFilter
-      }
+      scheduledTime,
     },
     _count: {
       id: true
