@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { $fetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { $fetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Issue #41: #3 scoped the *list* endpoints, but single-record and other
 // authenticated endpoints still returned full data to any logged-in non-admin.

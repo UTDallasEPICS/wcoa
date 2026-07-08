@@ -72,6 +72,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Test-only seam (issue #45): widen the read→write window so the signup race
+  // is reproducible through HTTP in e2e. No-op in production (see raceDelay).
+  await raceDelay(event, 'ride-signup')
+
   // 3. Assign Volunteer (atomic — issue #12)
   // The pre-checks above give good error messages, but they are a read
   // separate from the write below: two volunteers can both pass the in-memory

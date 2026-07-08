@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { $fetch, fetch as appFetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { $fetch, fetch as appFetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Issue #12 (TOCTOU race): signup.ts read the ride, checked status in memory,
 // then updated with `where: { id }` only. Two volunteers signing up at the same
@@ -14,13 +12,14 @@ await setup({
 // clause (`{ id, status: 'CREATED', volunteerId: null }`) and treats Prisma's
 // P2025 as "already taken" (409).
 //
-// Caveat: the test DB uses the synchronous better-sqlite3 adapter, which
-// serializes writes and does not yield mid-handler, so through the HTTP layer
-// the pre-fix code never actually double-assigns (the loser's separate read
-// already sees ASSIGNED and the in-memory pre-check returns 400). These tests
-// therefore pin the *invariant* — exactly one winner, assignment never
-// overwritten — which the WHERE-clause guard guarantees under any adapter that
-// does interleave. See the PR body for the revert-check / code-review evidence.
+// The synchronous better-sqlite3 adapter normally runs the handler's read and
+// write too close together for a competing request to interleave, so a naive
+// race test would pass even against the buggy code. We use the test-only
+// `x-test-race-delay` seam (issue #45, server/utils/testHooks.ts) to widen the
+// read→write window: both requests pass the in-memory pre-check, then race the
+// update. With the atomic WHERE guard exactly one wins (the other gets P2025 →
+// 409); WITHOUT it both updates land and the second overwrites the first — so
+// this test genuinely FAILS on the pre-fix code, not just pins an invariant.
 
 type Ride = {
   id: string
@@ -28,10 +27,14 @@ type Ride = {
   volunteerId: string | null
 }
 
-async function rawSignup(rideId: string, cookie: string): Promise<number> {
+// `raceDelayMs` opens the TOCTOU window via the test-only seam so concurrent
+// signups actually interleave through HTTP.
+async function rawSignup(rideId: string, cookie: string, raceDelayMs?: number): Promise<number> {
+  const headers: Record<string, string> = { cookie }
+  if (raceDelayMs) headers['x-test-race-delay'] = `ride-signup:${raceDelayMs}`
   const res = await appFetch(`/api/post/rides/${rideId}/signup`, {
     method: 'POST',
-    headers: { cookie },
+    headers,
   })
   return res.status
 }
@@ -51,10 +54,11 @@ describe('issue #12 — atomic ride signup', () => {
 
     const rideId = await findCreatedRideId(adminCookie)
 
-    // Fire two genuinely concurrent signups from two AVAILABLE volunteers.
+    // Fire two genuinely concurrent signups from two AVAILABLE volunteers, both
+    // holding the read→write window open (100ms) so they truly interleave.
     const results = await Promise.allSettled([
-      rawSignup(rideId, bobCookie),
-      rawSignup(rideId, aliceCookie),
+      rawSignup(rideId, bobCookie, 100),
+      rawSignup(rideId, aliceCookie, 100),
     ])
 
     const statuses = results.map((r) => (r.status === 'fulfilled' ? r.value : 500))

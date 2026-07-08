@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { $fetch, fetch as appFetch, setup } from '@nuxt/test-utils/e2e'
-import { fileURLToPath } from 'node:url'
+import { $fetch, fetch as appFetch } from '@nuxt/test-utils/e2e'
+import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
-await setup({
-  rootDir: fileURLToPath(new URL('../..', import.meta.url)),
-})
+await bootShared()
 
 // Issue #1: every core CRUD endpoint must require an authenticated session.
 // Issue #2: only admins may create/promote admins.

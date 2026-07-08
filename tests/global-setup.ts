@@ -1,19 +1,87 @@
-import { execSync } from 'node:child_process'
-import { mkdirSync, rmSync } from 'node:fs'
+import { execSync, spawn, type ChildProcess } from 'node:child_process'
+import { createServer } from 'node:net'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
-// Creates a fresh, seeded SQLite database for the e2e suite.
-// Must compute the same path as vitest.config.ts `env.DATABASE_URL`.
-export default function globalSetup() {
+// One-time e2e setup (issue #45): build the Nuxt app ONCE, seed a fresh SQLite
+// DB, and start a SINGLE server that every test file connects to (via
+// `setup({ host })`). Previously each test file called @nuxt/test-utils
+// `setup()`, which built + booted the app per file (~12 builds → slow, and the
+// first cold build could blow past the 120s per-file hook timeout).
+
+async function freePort(): Promise<number> {
+  return await new Promise((res, rej) => {
+    const srv = createServer()
+    srv.once('error', rej)
+    srv.listen(0, '127.0.0.1', () => {
+      const port = (srv.address() as { port: number }).port
+      srv.close(() => res(port))
+    })
+  })
+}
+
+function waitForReady(url: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  return new Promise((res, rej) => {
+    const tick = async () => {
+      try {
+        // Any HTTP response (even 401/404) means the server is up.
+        await fetch(url)
+        res()
+      } catch {
+        if (Date.now() > deadline) rej(new Error(`server not ready after ${timeoutMs}ms: ${url}`))
+        else setTimeout(tick, 250)
+      }
+    }
+    tick()
+  })
+}
+
+export default async function globalSetup() {
   const root = resolve(import.meta.dirname, '..')
   const dbPath = resolve(root, '.data/test.db')
 
+  // Fresh, seeded database.
   for (const suffix of ['', '-journal', '-wal', '-shm']) {
     rmSync(dbPath + suffix, { force: true })
   }
   mkdirSync(dirname(dbPath), { recursive: true })
 
-  const env = { ...process.env, DATABASE_URL: `file:${dbPath}` }
-  execSync('npx prisma db push', { cwd: root, env, stdio: 'inherit' })
-  execSync('npx tsx prisma/seed.ts', { cwd: root, env, stdio: 'inherit' })
+  const dbEnv = { ...process.env, DATABASE_URL: `file:${dbPath}` }
+  execSync('npx prisma db push', { cwd: root, env: dbEnv, stdio: 'inherit' })
+  execSync('npx tsx prisma/seed.ts', { cwd: root, env: dbEnv, stdio: 'inherit' })
+
+  // Build the production server once.
+  execSync('npx nuxt build', { cwd: root, env: dbEnv, stdio: 'inherit' })
+
+  // Start the single shared server the whole suite talks to.
+  const port = await freePort()
+  const host = `http://127.0.0.1:${port}`
+  const server: ChildProcess = spawn('node', ['.output/server/index.mjs'], {
+    cwd: root,
+    env: {
+      ...dbEnv,
+      PORT: String(port),
+      NITRO_PORT: String(port),
+      HOST: '127.0.0.1',
+      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? 'test-secret-not-for-production',
+      // Concurrency-test seam (issue #45): let tests open a TOCTOU window by
+      // injecting an await between read and write in guarded handlers. Off in
+      // normal runs; a test enables it per-request via a header.
+      TEST_RACE_HOOKS: '1',
+      DISABLE_RATE_LIMIT: 'true',
+    },
+    stdio: 'inherit',
+  })
+
+  await waitForReady(host, 120_000)
+
+  // Expose the shared host to worker processes. Env is inherited by forks
+  // spawned after globalSetup; the file is a robust fallback the harness reads.
+  process.env.NUXT_TEST_SHARED_HOST = host
+  writeFileSync(resolve(root, '.data/test-host.txt'), host)
+
+  return async () => {
+    server.kill('SIGTERM')
+  }
 }
