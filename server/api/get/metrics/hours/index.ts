@@ -6,15 +6,9 @@ export default defineEventHandler(async (event) => {
   requireAdmin(event)
 
   const query = getQuery(event)
-  const startDate = query.startDate ? new Date(String(query.startDate)) : undefined
-  const endDate = query.endDate ? new Date(String(query.endDate)) : undefined
-
-  const dateFilter = startDate || endDate ? {
-    scheduledTime: {
-      ...(startDate && { gte: startDate }),
-      ...(endDate && { lte: endDate })
-    }
-  } : {}
+  // Shared helper makes endDate inclusive of the whole day (issue #18).
+  const range = parseDateRange(query.startDate, query.endDate)
+  const dateFilter = range ? { scheduledTime: range } : {}
 
   const result = await prisma.ride.aggregate({
     _sum: {
