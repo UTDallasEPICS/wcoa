@@ -116,13 +116,13 @@ export default defineEventHandler(async (event) => {
   })
 
   // Notifications
-  const formattedTime = new Date(ride.scheduledTime).toLocaleString()
+  const scheduledTime = new Date(ride.scheduledTime)
   const commonContext = {
     client: ride.client.user.name,
     pickup: ride.pickupDisplay,
     dropoff: ride.dropoffDisplay,
-    date: formattedTime.split(',')[0],
-    time: formattedTime,
+    date: formatNotificationDate(scheduledTime),
+    time: formatNotificationTime(scheduledTime),
     link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
     notes: ride.notes || 'None',
   }
