@@ -39,15 +39,15 @@ export default defineEventHandler(async (event) => {
   }
 
   // 2. Upsert Address
-  // Using findFirst because unique constraint might not match perfectly if we don't normalize
-  // But strictly, we should use upsert or findUnique if strictly defined
-  // The schema has @@unique([street, city, state, zip])
-  const addressData = {
+  // Normalize first so case/whitespace-variant addresses collapse onto the
+  // @@unique([street, city, state, zip]) key instead of spawning duplicate
+  // rows (issue #16).
+  const addressData = normalizeAddress({
     street: body.street,
     city: body.city,
     state: body.state,
     zip: body.zip,
-  }
+  })
 
   const address = await prisma.address.upsert({
     where: {

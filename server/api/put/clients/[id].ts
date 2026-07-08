@@ -37,12 +37,14 @@ export default defineEventHandler(async (event) => {
 
     // Update Address (Link to new/existing address)
     if (body.street && body.city && body.state && body.zip) {
-      const addressData = {
+      // Normalize first so case/whitespace-variant addresses collapse onto the
+      // @@unique([street, city, state, zip]) key (issue #16).
+      const addressData = normalizeAddress({
         street: body.street,
         city: body.city,
         state: body.state,
         zip: body.zip,
-      }
+      })
 
       const address = await tx.address.upsert({
         where: {
