@@ -52,17 +52,13 @@ export default defineEventHandler(async (event) => {
   })
 
   // Notify all volunteers
-  const formattedTime = new Date(body.scheduledTime).toLocaleString('en-US', {
-    timeZone: 'America/Chicago',
-    dateStyle: 'full',
-    timeStyle: 'short',
-  })
+  const scheduledTime = new Date(body.scheduledTime)
 
   await broadcastNotification('RIDE_CREATED', {
     pickup: pickupDisplay,
     dropoff: dropoffDisplay,
-    date: formattedTime.split(',')[0], // Approximate date
-    time: formattedTime,
+    date: formatNotificationDate(scheduledTime),
+    time: formatNotificationTime(scheduledTime),
     link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
   })
 

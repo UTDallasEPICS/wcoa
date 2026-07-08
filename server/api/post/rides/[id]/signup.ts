@@ -118,11 +118,11 @@ export default defineEventHandler(async (event) => {
 
   // To Volunteer
   if (volunteerEmail) {
-    const formattedTime = new Date(ride.scheduledTime).toLocaleString()
+    const scheduledTime = new Date(ride.scheduledTime)
     notifications.push(sendNotification('RIDE_ASSIGNED', volunteer.id, {
       name: volunteer.user.name,
-      date: formattedTime.split(',')[0],
-      time: formattedTime,
+      date: formatNotificationDate(scheduledTime),
+      time: formatNotificationTime(scheduledTime),
       client: ride.client.user.name,
       pickup: ride.pickupDisplay,
       dropoff: ride.dropoffDisplay,
