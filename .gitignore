@@ -26,3 +26,9 @@ logs
 /prisma/generated
 /prisma/migrations
 /dev.db
+
+# Never commit DB dumps, databases, or build artifacts (issue #29)
+*.sql
+*.db
+*.sqlite
+*.tar.gz
