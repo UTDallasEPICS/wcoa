@@ -55,6 +55,24 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Issue #10: a ride can only be marked COMPLETED with a valid duration.
+  // The Complete modal (app/pages/rides/[id].vue) already enforces
+  // totalRideTime >= 0.1 via zod, but a direct API call could complete a ride
+  // with no duration — producing "Total Time: N/A" in the admin email and a
+  // completed ride with null hours that skews the metrics (#18). Require a
+  // valid totalRideTime either on this request OR already stored on the ride
+  // (so re-updating an already-completed ride without re-sending it still works).
+  if (body.status === 'COMPLETED') {
+    const effectiveRideTime =
+      body.totalRideTime !== undefined ? body.totalRideTime : existingRide.totalRideTime
+    if (effectiveRideTime == null || effectiveRideTime < 0.1) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'totalRideTime (at least 0.1 hours) is required to complete a ride',
+      })
+    }
+  }
+
   // Build the Prisma update payload only from validated, whitelisted fields.
   const updateData: {
     status?: 'CREATED' | 'ASSIGNED' | 'COMPLETED'
