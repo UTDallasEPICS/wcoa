@@ -97,25 +97,7 @@
   })
 
   // --- State ---
-  const state = reactive({
-    clientId: '',
-    pickup: {
-      street: '',
-      city: '',
-      state: '',
-      zip: '',
-    },
-    dropoff: {
-      street: '',
-      city: '',
-      state: '',
-      zip: '',
-    },
-    scheduledTime: '',
-    pickupTime: '',
-    notes: '',
-    volunteerId: undefined as any,
-  })
+  const state = reactive(blankRideForm())
 
   // --- Autocomplete Logic ---
   const pickupSearch = ref('')
@@ -340,16 +322,20 @@
       })
       isCreateModalOpen.value = false
       await refreshRides()
-      // Reset state
-      Object.assign(state, {
-        clientId: '',
-        pickupDisplay: '',
-        dropoffDisplay: '',
-        scheduledTime: '',
-        pickupTime: '',
-        notes: '',
-        volunteerId: undefined,
-      })
+      // Reset state back to a blank form. Assign into the nested pickup/dropoff
+      // objects so the reactive references are preserved and the address fields
+      // actually clear (issue #11 — the old reset used non-existent
+      // `pickupDisplay`/`dropoffDisplay` keys and never cleared the addresses).
+      const blank = blankRideForm()
+      Object.assign(state.pickup, blank.pickup)
+      Object.assign(state.dropoff, blank.dropoff)
+      state.clientId = blank.clientId
+      state.scheduledTime = blank.scheduledTime
+      state.pickupTime = blank.pickupTime
+      state.notes = blank.notes
+      state.volunteerId = blank.volunteerId
+      pickupSearch.value = ''
+      dropoffSearch.value = ''
     } catch (err) {
       console.error('Failed to create ride', err)
     }
