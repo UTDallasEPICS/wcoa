@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       data: {
         role: 'ADMIN',
         name: body.name,
-        phone: body.phone,
+        phone: emptyToNull(body.phone),
       },
     })
   } else {
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
       data: {
         name: body.name,
         email: body.email,
-        phone: body.phone,
+        phone: emptyToNull(body.phone),
         role: 'ADMIN',
       },
     })
