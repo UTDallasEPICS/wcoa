@@ -44,16 +44,23 @@ export default defineEventHandler(async (event) => {
     take: 5
   })
 
-  const topRiders = await Promise.all(topRidersRaw.map(async (item) => {
-    const client = await prisma.client.findUnique({
-      where: { id: item.clientId },
-      include: { user: true }
-    })
+  // Batch the client lookups into a single query to avoid an N+1 (issue #24):
+  // resolve every grouped clientId at once, then map by id to preserve the
+  // existing output shape and the count-desc ordering from the groupBy above.
+  const clientIds = topRidersRaw.map((item) => item.clientId)
+  const clients = await prisma.client.findMany({
+    where: { id: { in: clientIds } },
+    include: { user: true }
+  })
+  const clientsById = new Map(clients.map((client) => [client.id, client]))
+
+  const topRiders = topRidersRaw.map((item) => {
+    const client = clientsById.get(item.clientId)
     return {
       name: client?.user?.name || 'Unknown',
       completedRides: item._count.id
     }
-  }))
+  })
 
   return topRiders
 })

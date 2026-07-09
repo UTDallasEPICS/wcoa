@@ -35,17 +35,17 @@ describe('query-count seam (#45)', () => {
     expect(queryCount).toBeLessThanOrEqual(5)
   })
 
-  it('detects the topRiders N+1 (issue #24): more queries than a batched version would need', async () => {
+  it('keeps topRiders batched (issue #24): groupBy + one findMany, not an N+1', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
     const { status, queryCount } = await fetchWithQueryCount('/api/get/metrics/topRiders', {
       headers: { cookie },
     })
     expect(status).toBe(200)
-    // topRiders currently does groupBy + one findUnique PER grouped client (N+1).
-    // With the seeded COMPLETED rides that is > 2 queries. The batched fix (#24)
-    // will bring this to <= 2 — at which point this assertion should be tightened
-    // to `toBeLessThanOrEqual(2)`. Proves the seam catches a real N+1.
-    expect(queryCount).toBeGreaterThan(2)
+    // topRiders does groupBy + a single batched findMany for the grouped clients
+    // (issue #24 fix). Previously it ran one findUnique PER grouped client (N+1,
+    // > 2 queries with the seeded COMPLETED rides). The batched version stays at
+    // <= 2 regardless of how many clients are returned.
+    expect(queryCount).toBeLessThanOrEqual(2)
   })
 
   it('is opt-in: no x-query-count header without the request opt-in', async () => {
