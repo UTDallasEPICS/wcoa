@@ -54,13 +54,17 @@ export default defineEventHandler(async (event) => {
   // Notify all volunteers
   const scheduledTime = new Date(body.scheduledTime)
 
-  await broadcastNotification('RIDE_CREATED', {
+  // Fire-and-forget the broadcast (issue #32): the ride is created, so return it
+  // immediately instead of blocking the response on N sequential SMTP sends. A
+  // slow or failing broadcast must not delay or fail ride creation, so we don't
+  // await it and swallow any error in the background (mirrors signup.ts).
+  broadcastNotification('RIDE_CREATED', {
     pickup: pickupDisplay,
     dropoff: dropoffDisplay,
     date: formatNotificationDate(scheduledTime),
     time: formatNotificationTime(scheduledTime),
     link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
-  })
+  }, event).catch(console.error)
 
   return ride
 })
