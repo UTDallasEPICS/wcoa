@@ -65,10 +65,11 @@ export default async function globalSetup() {
       NITRO_PORT: String(port),
       HOST: '127.0.0.1',
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? 'test-secret-not-for-production',
-      // Concurrency-test seam (issue #45): let tests open a TOCTOU window by
-      // injecting an await between read and write in guarded handlers. Off in
-      // normal runs; a test enables it per-request via a header.
-      TEST_RACE_HOOKS: '1',
+      // Enables the test-only seams (issue #45): the concurrency read→write
+      // delay (x-test-race-delay) and the per-request query counter
+      // (x-test-count-queries → x-query-count). Both are per-request opt-in and
+      // strict no-ops without this flag, which only the harness ever sets.
+      TEST_HOOKS: '1',
       DISABLE_RATE_LIMIT: 'true',
     },
     stdio: 'inherit',

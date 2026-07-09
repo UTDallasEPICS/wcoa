@@ -1,4 +1,4 @@
-import { setup } from '@nuxt/test-utils/e2e'
+import { setup, fetch as appFetch } from '@nuxt/test-utils/e2e'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -20,4 +20,29 @@ export async function bootShared() {
     rootDir: fileURLToPath(new URL('../..', import.meta.url)),
     host: sharedHost(),
   })
+}
+
+// Query-count seam (issue #45). Issues a request with the count opt-in header
+// and returns how many Prisma queries the handler ran (post-auth) alongside the
+// parsed JSON body, so tests can pin N+1 / unbounded-query regressions.
+//
+// IMPORTANT: the counter is a module-level global on the server, so the caller
+// must AWAIT this (one measured request in flight at a time) — do not fire
+// concurrent counted requests, or the counts will interleave.
+export async function fetchWithQueryCount<T = unknown>(
+  path: string,
+  opts: { headers?: Record<string, string>; method?: string; body?: unknown } = {},
+): Promise<{ status: number; queryCount: number; body: T }> {
+  const res = await appFetch(path, {
+    method: opts.method ?? 'GET',
+    headers: { ...opts.headers, 'x-test-count-queries': '1' },
+    ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
+  })
+  const header = res.headers.get('x-query-count')
+  const body = (await res.json().catch(() => null)) as T
+  return {
+    status: res.status,
+    queryCount: header === null ? NaN : Number(header),
+    body,
+  }
 }
