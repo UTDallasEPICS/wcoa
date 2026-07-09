@@ -81,6 +81,9 @@ describe('PUT /api/put/rides/[id] — unassigning a volunteer (issue #7)', () =>
     const updated = await put(cookie, assigned.id, {
       volunteerId: '',
       status: 'COMPLETED',
+      // totalRideTime required to complete (issue #10); the #7 behavior under
+      // test here is the status/volunteer handling, not the duration check.
+      totalRideTime: 1.5,
     })
 
     expect(updated.volunteerId).toBeNull()
