@@ -1,8 +1,14 @@
 import { prisma } from './prisma'
 import { sendNotification } from './notification'
+import { maybeFault } from './testHooks'
 
 export async function processReminders() {
   const now = new Date()
+
+  // Test-only fault point (issue #45): a test can arm 'reminders-scan' (via the
+  // _test/run-reminders endpoint) to simulate the job crashing mid-run. No-op in
+  // production. #17 can add a finer point between send and the SentReminder write.
+  maybeFault('reminders-scan')
 
   // 1. Fetch upcoming rides that are assigned but not completed
   const rides = await prisma.ride.findMany({
