@@ -3,6 +3,11 @@
   import type { TableColumn, TableRow } from '@nuxt/ui'
   import * as z from 'zod'
   import { authClient } from '../../utils/auth-client'
+  import {
+    BASE_FILTER_OPTIONS,
+    DEFAULT_EXCLUDED_FILTERS,
+    sanitizeSavedFilters,
+  } from '../../utils/rideFilters'
 
   const UBadge = resolveComponent('UBadge')
 
@@ -27,15 +32,22 @@
   const savedExcludedFilters = useCookie<{ label: string; value: string }[]>(
     'ride-excluded-filters',
     {
-      default: () => [
-        { label: 'Completed', value: 'status:COMPLETED' },
-        { label: 'Cancelled', value: 'status:CANCELLED' },
-      ],
-    } // Default exclude
+      default: () => [...DEFAULT_EXCLUDED_FILTERS], // Default exclude (see issue #22)
+    }
   )
 
-  const activeFilters = ref<{ label: string; value: string }[]>(savedActiveFilters.value)
-  const excludedFilters = ref<{ label: string; value: string }[]>(savedExcludedFilters.value)
+  // All values the UI can actually toggle. Includes `assign:ME` because it is a
+  // valid (volunteer-only) filter; base status options are always valid. Any
+  // saved value outside this set (e.g. the stale `status:CANCELLED`) is stripped
+  // on load so existing users aren't stuck with an un-toggleable filter (#22).
+  const knownFilterValues = [...BASE_FILTER_OPTIONS.map((o) => o.value), 'assign:ME']
+
+  const activeFilters = ref<{ label: string; value: string }[]>(
+    sanitizeSavedFilters(savedActiveFilters.value, knownFilterValues)
+  )
+  const excludedFilters = ref<{ label: string; value: string }[]>(
+    sanitizeSavedFilters(savedExcludedFilters.value, knownFilterValues)
+  )
 
   // Use watch to refetch when sort changes
   const {
@@ -67,11 +79,7 @@
   const isCreateModalOpen = ref(false)
 
   const filterOptions = computed(() => {
-    const options = [
-      { label: 'Created', value: 'status:CREATED' },
-      { label: 'Assigned', value: 'status:ASSIGNED' },
-      { label: 'Completed', value: 'status:COMPLETED' },
-    ]
+    const options = [...BASE_FILTER_OPTIONS]
     if (!isAdmin.value) {
       options.push({ label: 'Assigned to Me', value: 'assign:ME' })
     }
