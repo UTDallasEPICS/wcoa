@@ -1,3 +1,4 @@
+import type { H3Event } from 'h3'
 import { prisma } from './prisma'
 import { sendEmail } from './email'
 
@@ -68,15 +69,21 @@ export async function sendNotification(
 
 export async function broadcastNotification(
   type: NotificationType,
-  context: NotificationContext
+  context: NotificationContext,
+  event?: H3Event
 ) {
+  // Test-only seam (issue #45): throw here so e2e can pin the non-blocking fix
+  // for #32. No-op in production (see maybeFault).
+  maybeFault('ride-broadcast', event)
+
   // Fetch all available volunteers
   const volunteers = await prisma.volunteer.findMany({
     where: { status: 'AVAILABLE' },
   })
 
-  // Send to all (sendNotification handles individual preferences)
-  for (const vol of volunteers) {
-    await sendNotification(type, vol.id, context)
-  }
+  // Send to all in parallel (sendNotification handles individual preferences).
+  // allSettled so one failed send doesn't abort the rest of the broadcast.
+  await Promise.allSettled(
+    volunteers.map((vol) => sendNotification(type, vol.id, context))
+  )
 }
