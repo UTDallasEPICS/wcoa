@@ -16,9 +16,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid notifications data' })
   }
 
-  // Get volunteer ID from session user
-  const volunteer = await prisma.volunteer.findUnique({
-    where: { userId: session.user.id },
+  // Get volunteer ID from session user.
+  // Soft delete (issue #27): an archived volunteer is treated as gone, even
+  // with a stale session.
+  const volunteer = await prisma.volunteer.findFirst({
+    where: { userId: session.user.id, deletedAt: null },
   })
 
   if (!volunteer) {

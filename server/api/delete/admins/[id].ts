@@ -25,15 +25,22 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    return await prisma.user.update({
-      where: { id, deletedAt: null },
-      data: {
-        deletedAt: new Date(),
-        deletedEmail: existing.email,
-        deletedPhone: existing.phone,
-        email: null,
-        phone: null,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id, deletedAt: null },
+        data: {
+          deletedAt: new Date(),
+          deletedEmail: existing.email,
+          deletedPhone: existing.phone,
+          email: null,
+          phone: null,
+        },
+      })
+      // Revoke sessions (issue #27, decision #1): a hard delete used to cascade
+      // to the session table and log the user out. Soft delete must do the same
+      // explicitly, or an archived user's live cookie would keep API access.
+      await tx.session.deleteMany({ where: { userId: id } })
+      return updated
     })
   } catch (err) {
     if (

@@ -20,6 +20,8 @@ await bootShared()
 //      login flow — the OTP send is rejected, so loginAs throws.
 //   4. Metrics preserved: a soft-deleted COMPLETED ride still counts in
 //      completionRate / hours.
+//   5. Session revocation (decision #1): soft-deleting a user deletes their
+//      session rows, so a previously-valid cookie is rejected afterward.
 
 const ADMIN = 'reachtusharwani@gmail.com'
 const uniq = () => Math.random().toString(36).slice(2, 10)
@@ -239,5 +241,62 @@ describe('soft deletes (#27)', () => {
       hoursBefore.totalHours + 2,
       5
     )
+  })
+
+  it('revokes sessions on soft-delete: an archived user\'s live cookie is rejected (decision #1)', async () => {
+    const adminCookie = await loginAs(ADMIN)
+    const email = `revoke-vol-${uniq()}@example.com`
+
+    // Create a volunteer and log in as them, capturing a LIVE session cookie.
+    const created = await $fetch<{ id: string; userId: string }>(
+      '/api/post/volunteers',
+      {
+        method: 'POST',
+        headers: { cookie: adminCookie },
+        body: { name: 'Revoke Vol', email, status: 'AVAILABLE' },
+      }
+    )
+    expect(created.id).toBeTruthy()
+
+    const volCookie = await loginAs(email)
+
+    // Probe a session+role-gated endpoint that does NOT re-check the volunteer
+    // profile: GET /api/get/rides succeeds for any authenticated volunteer. This
+    // isolates session validity (the global auth middleware) from the per-handler
+    // deletedAt guards, so we're really testing session revocation.
+    const okRes = await appFetch('/api/get/rides', {
+      headers: { cookie: volCookie },
+    })
+    expect(okRes.status, 'live session should be accepted').toBe(200)
+
+    // Admin soft-deletes the volunteer.
+    const del = await appFetch(`/api/delete/volunteers/${created.id}`, {
+      method: 'DELETE',
+      headers: { cookie: adminCookie },
+    })
+    expect(del.status).toBe(200)
+
+    // The SAME (previously valid) cookie must now be rejected at the auth layer —
+    // hard delete used to cascade to the session table; soft delete must revoke
+    // sessions too, or the archived user keeps full API access despite the
+    // decision-#1 login block. Pre-fix the session survives, so this returns 200.
+    const afterRes = await appFetch('/api/get/rides', {
+      headers: { cookie: volCookie },
+    })
+    expect(
+      afterRes.status,
+      'archived user\'s stale cookie must be rejected (401)'
+    ).toBe(401)
+
+    // And no session rows remain for that user (direct DB read).
+    const conn = db()
+    try {
+      const row = conn
+        .prepare('SELECT COUNT(*) AS n FROM session WHERE userId = ?')
+        .get(created.userId) as { n: number }
+      expect(row.n, 'all sessions for the archived user must be deleted').toBe(0)
+    } finally {
+      conn.close()
+    }
   })
 })
