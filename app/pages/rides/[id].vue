@@ -182,6 +182,14 @@
     return `https://www.google.com/maps/embed/v1/directions?key=${apiKey || ''}&origin=${origin}&destination=${destination}`
   })
 
+  // Universal maps directions deep-link: origin = pickup, destination = dropoff.
+  // On a phone the OS hands this off to the native maps app; on desktop it
+  // opens Google Maps directions in the browser.
+  const navigateUrl = computed(() => {
+    if (!ride.value) return ''
+    return buildMapsDeepLink(ride.value.pickupDisplay, ride.value.dropoffDisplay)
+  })
+
   const volunteerOptions = computed(() => {
     if (!volunteers.value) return []
     const list = volunteers.value.map((v: any) => ({
@@ -353,6 +361,19 @@
                 <p class="font-medium">{{ estimate.distance }}</p>
               </div>
             </div>
+
+            <UButton
+              :to="navigateUrl"
+              target="_blank"
+              rel="noopener"
+              label="Navigate"
+              icon="i-lucide-navigation"
+              color="primary"
+              size="lg"
+              block
+              external
+              data-testid="navigate-link"
+            />
 
             <div class="aspect-video w-full overflow-hidden rounded-lg border">
               <iframe
