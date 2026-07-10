@@ -10,6 +10,14 @@ const sessionCache = new Map<string, string>()
 let ipCounter = 0
 
 /**
+ * Drop all cached login cookies. Called by resetDb() (issue #62): a DB reset
+ * wipes the `session` rows those cookies reference, so they must be re-minted.
+ */
+export function clearSessionCache(): void {
+  sessionCache.clear()
+}
+
+/**
  * Logs in through the real better-auth email-OTP flow without SMTP.
  * The app swallows email-send failures, but better-auth stores the OTP in the
  * `verification` table first — so we request an OTP, read it straight from the

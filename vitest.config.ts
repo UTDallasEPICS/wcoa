@@ -7,6 +7,9 @@ export default defineConfig({
   test: {
     include: ['tests/e2e/**/*.test.ts'],
     globalSetup: ['tests/global-setup.ts'],
+    // Reset the shared SQLite DB to its seed snapshot before every test file so
+    // the suite is order-independent (issue #62). Runs once per worker/file.
+    setupFiles: ['tests/setup-reset-db.ts'],
     // The e2e suite boots one Nuxt server against one shared SQLite file,
     // so test files must not run in parallel.
     fileParallelism: false,

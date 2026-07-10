@@ -2,6 +2,7 @@ import { execSync, spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { captureSeedSnapshot } from './utils/reset-db'
 
 // One-time e2e setup (issue #45): build the Nuxt app ONCE, seed a fresh SQLite
 // DB, and start a SINGLE server that every test file connects to (via
@@ -50,6 +51,11 @@ export default async function globalSetup() {
   const dbEnv = { ...process.env, DATABASE_URL: `file:${dbPath}` }
   execSync('npx prisma db push', { cwd: root, env: dbEnv, stdio: 'inherit' })
   execSync('npx tsx prisma/seed.ts', { cwd: root, env: dbEnv, stdio: 'inherit' })
+
+  // Snapshot the freshly-seeded rows so each test file can cheaply restore them
+  // and stay order-independent (issue #62). Point resetDb() at the same file.
+  process.env.DATABASE_URL = `file:${dbPath}`
+  captureSeedSnapshot()
 
   // Build the production server once.
   execSync('npx nuxt build', { cwd: root, env: dbEnv, stdio: 'inherit' })
