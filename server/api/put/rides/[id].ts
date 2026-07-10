@@ -83,6 +83,11 @@ export default defineEventHandler(async (event) => {
     notes?: string | null
     pickupDisplay?: string
     dropoffDisplay?: string
+    cachedDistanceText?: string | null
+    cachedDistanceValue?: number | null
+    cachedDurationText?: string | null
+    cachedDurationValue?: number | null
+    estimatedAt?: Date | null
   } = {}
 
   if (body.status !== undefined) updateData.status = body.status
@@ -90,6 +95,21 @@ export default defineEventHandler(async (event) => {
   if (body.notes !== undefined) updateData.notes = body.notes
   if (body.pickupDisplay !== undefined) updateData.pickupDisplay = body.pickupDisplay
   if (body.dropoffDisplay !== undefined) updateData.dropoffDisplay = body.dropoffDisplay
+
+  // Issue #14: a cached Maps estimate is only valid for the addresses it was
+  // computed from. If either display address actually changes, invalidate the
+  // cache (null all cache columns) so the next /estimate call re-fetches.
+  const pickupChanged =
+    body.pickupDisplay !== undefined && body.pickupDisplay !== existingRide.pickupDisplay
+  const dropoffChanged =
+    body.dropoffDisplay !== undefined && body.dropoffDisplay !== existingRide.dropoffDisplay
+  if (pickupChanged || dropoffChanged) {
+    updateData.cachedDistanceText = null
+    updateData.cachedDistanceValue = null
+    updateData.cachedDurationText = null
+    updateData.cachedDurationValue = null
+    updateData.estimatedAt = null
+  }
 
   if (body.scheduledTime !== undefined) {
     updateData.scheduledTime = new Date(body.scheduledTime)
