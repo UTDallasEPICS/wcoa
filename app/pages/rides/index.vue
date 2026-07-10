@@ -108,21 +108,61 @@
   const state = reactive(blankRideForm())
 
   // --- Autocomplete Logic ---
+  // Query the backend with `?search=` (debounced) instead of fetching a fixed
+  // list of 20 once on mount and filtering it client-side. This lets any address
+  // in the table surface, not just the first 20 alphabetically (issue #19). The
+  // query-building and debounce logic live in a pure, unit-tested helper.
   const pickupSearch = ref('')
   const dropoffSearch = ref('')
 
-  const { data: addresses } = await useFetch('/api/get/addresses')
+  const pickupOptions = ref<any[]>([])
+  const dropoffOptions = ref<any[]>([])
 
-  const pickupOptions = computed(() => {
-    if (!pickupSearch.value || !addresses.value) return []
-    const q = pickupSearch.value.toLowerCase()
-    return addresses.value.filter((a: any) => a.label.toLowerCase().includes(q)).slice(0, 5)
+  async function fetchAddressOptions(search: string, target: Ref<any[]>) {
+    const query = buildAddressQuery(search)
+    if (!query) {
+      target.value = []
+      return
+    }
+    try {
+      const results = await $fetch<any[]>('/api/get/addresses', { query })
+      // Ignore stale responses: only apply if the input still matches the term
+      // we searched for (avoids out-of-order results overwriting newer ones).
+      if ((search ?? '').trim() === query.search) {
+        target.value = (results ?? []).slice(0, 5)
+      }
+    } catch (err) {
+      console.error('Failed to fetch address suggestions', err)
+      target.value = []
+    }
+  }
+
+  const debouncedPickupFetch = debounce(
+    (search: string) => fetchAddressOptions(search, pickupOptions),
+    250
+  )
+  const debouncedDropoffFetch = debounce(
+    (search: string) => fetchAddressOptions(search, dropoffOptions),
+    250
+  )
+
+  watch(pickupSearch, (term) => {
+    if (!buildAddressQuery(term)) {
+      // Clear immediately (and cancel any pending fetch) when the box empties.
+      debouncedPickupFetch.cancel()
+      pickupOptions.value = []
+      return
+    }
+    debouncedPickupFetch(term)
   })
 
-  const dropoffOptions = computed(() => {
-    if (!dropoffSearch.value || !addresses.value) return []
-    const q = dropoffSearch.value.toLowerCase()
-    return addresses.value.filter((a: any) => a.label.toLowerCase().includes(q)).slice(0, 5)
+  watch(dropoffSearch, (term) => {
+    if (!buildAddressQuery(term)) {
+      debouncedDropoffFetch.cancel()
+      dropoffOptions.value = []
+      return
+    }
+    debouncedDropoffFetch(term)
   })
 
   const volunteerOptions = computed(() => {
