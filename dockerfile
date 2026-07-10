@@ -59,9 +59,21 @@ COPY --from=prod-deps /app/node_modules ./.output/server/node_modules
 # Copy the generated Prisma Client
 COPY --from=builder /app/prisma/generated ./prisma/generated
 
-# Copy prisma schema just in case it's needed for runtime validations or migrations
+# Copy the prisma schema AND the committed migrations (issue #33) so the
+# entrypoint can run `prisma migrate deploy` against the production DB at start.
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Install ONLY the prisma CLI (+ dotenv, which prisma.config.ts loads) into the
+# app root so `prisma migrate deploy` can run at container start. Pinned to the
+# project's Prisma version. This is separate from the app's runtime deps in
+# .output/server/node_modules (which carry @prisma/client but not the CLI).
+RUN npm install --no-save prisma@7.2.0 dotenv@17.2.3
+
+# Apply any pending migrations, then start the server (see docker-entrypoint.sh).
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 EXPOSE 3000
 
-CMD ["node", ".output/server/index.mjs"]
+CMD ["./docker-entrypoint.sh"]
