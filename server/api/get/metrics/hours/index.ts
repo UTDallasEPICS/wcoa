@@ -10,6 +10,9 @@ export default defineEventHandler(async (event) => {
   const range = parseDateRange(query.startDate, query.endDate)
   const dateFilter = range ? { scheduledTime: range } : {}
 
+  // Soft delete (issue #27): metrics DELIBERATELY do NOT filter deletedAt —
+  // a soft-deleted COMPLETED ride still counts toward volunteer hours, so
+  // historical totals are preserved (the whole point of soft-delete here).
   const result = await prisma.ride.aggregate({
     _sum: {
       totalRideTime: true

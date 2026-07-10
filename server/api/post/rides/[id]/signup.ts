@@ -47,8 +47,10 @@ export default defineEventHandler(async (event) => {
   }
 
   // 2. Check Ride status
-  const ride = await prisma.ride.findUnique({
-    where: { id },
+  // Soft delete (issue #27): an archived ride can't be signed up for — treat it
+  // as not found. The atomic assignment below also re-checks status.
+  const ride = await prisma.ride.findFirst({
+    where: { id, deletedAt: null },
     include: {
       client: {
         include: {
@@ -87,7 +89,7 @@ export default defineEventHandler(async (event) => {
   let updatedRide
   try {
     updatedRide = await prisma.ride.update({
-      where: { id, status: 'CREATED', volunteerId: null },
+      where: { id, status: 'CREATED', volunteerId: null, deletedAt: null },
       data: {
         volunteerId: volunteer.id,
         status: 'ASSIGNED'

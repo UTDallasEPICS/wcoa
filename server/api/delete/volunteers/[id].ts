@@ -10,24 +10,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Issue #23: volunteerId is optional, so the ride->volunteer FK is ON DELETE
-  // SET NULL — deleting a volunteer doesn't crash, but their ASSIGNED rides
-  // keep status ASSIGNED with no volunteer (the stuck state from #7). Reset
-  // those rides back to CREATED so they return to the available pool, then
-  // delete the volunteer. Do both atomically so we can't leave rides stuck if
-  // the delete fails.
+  // Issue #23: volunteerId is optional, so deleting a volunteer doesn't crash,
+  // but their ASSIGNED rides would keep status ASSIGNED with no active volunteer
+  // (the stuck state from #7). Reset those rides back to CREATED so they return
+  // to the available pool, then archive the volunteer. Do it all atomically.
   //
-  // Issue #8: deleting only the Volunteer profile left an orphaned User (role
-  // VOLUNTEER, no profile) that crashes frontend queries reading
-  // user.volunteer.id. Delete the underlying User instead — Volunteer.user is
-  // onDelete: Cascade, so this removes the volunteer row too, leaving no
-  // orphan. The reset rides keep pointing at null (ride->volunteer FK is SET
-  // NULL), so historical/available rides are unaffected. (Roles are singular in
-  // this app, so a User won't also hold a client profile.)
+  // Issue #8 / #27: soft-delete the underlying User AND the Volunteer row
+  // together (roles are singular, so a User won't also hold a client profile).
+  // On the user we RELEASE the unique contact values (email -> deletedEmail,
+  // phone -> deletedPhone, then null email/phone) so the same email/phone can be
+  // reused by a new record without a unique violation (decision #2). We clear
+  // volunteerId on their ASSIGNED rides so the available-rides scoping (which
+  // still sees CREATED rides) doesn't leak the archived volunteer's link.
   return await prisma.$transaction(async (tx) => {
-    const volunteer = await tx.volunteer.findUnique({
-      where: { id },
-      select: { userId: true },
+    const volunteer = await tx.volunteer.findFirst({
+      where: { id, deletedAt: null },
+      select: { userId: true, user: { select: { email: true, phone: true } } },
     })
     if (!volunteer) {
       throw createError({
@@ -38,11 +36,23 @@ export default defineEventHandler(async (event) => {
 
     await tx.ride.updateMany({
       where: { volunteerId: id, status: 'ASSIGNED' },
-      data: { status: 'CREATED' },
+      data: { status: 'CREATED', volunteerId: null },
     })
 
-    return await tx.user.delete({
+    const now = new Date()
+    await tx.volunteer.update({
+      where: { id },
+      data: { deletedAt: now },
+    })
+    return await tx.user.update({
       where: { id: volunteer.userId },
+      data: {
+        deletedAt: now,
+        deletedEmail: volunteer.user.email,
+        deletedPhone: volunteer.user.phone,
+        email: null,
+        phone: null,
+      },
     })
   })
 })

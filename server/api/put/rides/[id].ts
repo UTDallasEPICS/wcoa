@@ -35,9 +35,10 @@ export default defineEventHandler(async (event) => {
 
   const body = await readValidatedBody(event, updateRideSchema)
 
-  // Fetch existing ride to check previous state
-  const existingRide = await prisma.ride.findUnique({
-    where: { id },
+  // Fetch existing ride to check previous state.
+  // Soft delete (issue #27): an archived ride can't be updated/completed — 404.
+  const existingRide = await prisma.ride.findFirst({
+    where: { id, deletedAt: null },
     include: {
       volunteer: {
         include: { user: true },

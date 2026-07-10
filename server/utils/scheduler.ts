@@ -11,15 +11,21 @@ export async function processReminders() {
   // production. #17 can add a finer point between send and the SentReminder write.
   maybeFault('reminders-scan')
 
-  // 1. Fetch upcoming rides that are assigned but not completed
+  // 1. Fetch upcoming rides that are assigned but not completed.
+  // Soft delete (issue #27): never send reminders for an archived ride, or to an
+  // archived volunteer. Both are filtered here so the scan skips them entirely.
   const rides = await prisma.ride.findMany({
     where: {
       status: 'ASSIGNED',
+      deletedAt: null,
       scheduledTime: {
         gt: now,
       },
       volunteerId: {
         not: null,
+      },
+      volunteer: {
+        deletedAt: null,
       },
     },
     include: {

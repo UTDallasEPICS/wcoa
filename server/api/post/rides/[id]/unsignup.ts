@@ -39,8 +39,9 @@ export default defineEventHandler(async (event) => {
   }
 
   // 2. Check Ride status and assignment
-  const ride = await prisma.ride.findUnique({
-    where: { id }
+  // Soft delete (issue #27): an archived ride is treated as not found.
+  const ride = await prisma.ride.findFirst({
+    where: { id, deletedAt: null }
   })
 
   if (!ride) {
