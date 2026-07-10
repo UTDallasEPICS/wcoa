@@ -25,7 +25,7 @@ Same trick works for manual dev-server verification: POST `/api/auth/email-otp/s
 ## Gotchas
 
 - **Merging to `main` deploys**: CI builds and pushes the production Docker image on every push to `main` (`.github/workflows/main.yml`). All work goes through PR branches.
-- **Do not open or copy `prod.sql` / `deploy.tar.gz`**: `prod.sql` is a production dump containing real client PII, pending removal and history purge (issue #29). Never quote its contents anywhere.
+- **`prod.sql` / `deploy.tar.gz` removed from the tree (issue #29)** but they remain in **git history** (purge + secret rotation still pending). `prod.sql` was a production dump with real client PII — never restore, open, or quote it from history.
 - `prisma/migrations` is gitignored (issue #33) — schema changes are applied with `db push` locally; flag migration needs in the PR until #33 is fixed.
 - `RideStatus` enum is only `CREATED | ASSIGNED | COMPLETED` — code paths mentioning `CANCELLED` are dead/broken (issues #5, #22).
 - `sendEmail` swallows all failures (issue #25); most API routes have no auth (issue #1) — don't "fix" these in passing, they have dedicated issues.
