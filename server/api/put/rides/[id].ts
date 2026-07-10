@@ -11,7 +11,7 @@ import { readValidatedBody } from '../../../utils/validation'
 // totalRideTime) still work; unknown keys are rejected via .strict().
 const updateRideSchema = z
   .object({
-    status: z.enum(['CREATED', 'ASSIGNED', 'COMPLETED']).optional(),
+    status: z.enum(['CREATED', 'ASSIGNED', 'COMPLETED', 'CANCELLED']).optional(),
     // Empty string means "unassign"; handled below into null.
     volunteerId: z.string().nullable().optional(),
     scheduledTime: z.string().min(1).optional(),
@@ -75,7 +75,7 @@ export default defineEventHandler(async (event) => {
 
   // Build the Prisma update payload only from validated, whitelisted fields.
   const updateData: {
-    status?: 'CREATED' | 'ASSIGNED' | 'COMPLETED'
+    status?: 'CREATED' | 'ASSIGNED' | 'COMPLETED' | 'CANCELLED'
     volunteerId?: string | null
     scheduledTime?: Date
     pickupTime?: Date | null
@@ -177,11 +177,10 @@ export default defineEventHandler(async (event) => {
   }
 
   // 2. RIDE_CANCELLED
-  // (Currently no CANCELLED status in RideStatus enum, handling for future proofing or custom status strings)
-  if ((body.status as string) === 'CANCELLED' && (existingRide.status as string) !== 'CANCELLED') {
-    // Notify the volunteer who WAS assigned (even if unassigned in this update, though unlikely for cancellation)
-    // Assuming volunteer is still attached or was attached in existingRide
-    const volunteerToNotify = existingRide.volunteer // Notify the volunteer who was assigned before cancellation
+  // Fires when an admin cancels a ride (status -> CANCELLED). Notify the
+  // volunteer who was assigned before cancellation so they know the ride is off.
+  if (body.status === 'CANCELLED' && existingRide.status !== 'CANCELLED') {
+    const volunteerToNotify = existingRide.volunteer
 
     if (volunteerToNotify) {
       await sendNotification('RIDE_CANCELLED', volunteerToNotify.id, {
