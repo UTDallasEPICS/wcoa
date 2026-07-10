@@ -32,3 +32,6 @@ logs
 *.db
 *.sqlite
 *.tar.gz
+
+# Personal AI-tool config (issue #34)
+.gemini/
