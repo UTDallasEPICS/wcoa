@@ -1,3 +1,4 @@
+import { Prisma } from '../../../../prisma/generated/client'
 import { prisma } from '../../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
@@ -10,7 +11,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return await prisma.ride.delete({
-    where: { id },
-  })
+  // Soft delete (issue #27): mark the ride archived instead of destroying it, so
+  // it disappears from active views while COMPLETED rides still feed historical
+  // metrics. Guard on deletedAt: null so a second delete of an already-archived
+  // ride 404s (P2025) rather than silently re-archiving.
+  try {
+    return await prisma.ride.update({
+      where: { id, deletedAt: null },
+      data: { deletedAt: new Date() },
+    })
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2025'
+    ) {
+      throw createError({ statusCode: 404, statusMessage: 'Ride not found' })
+    }
+    throw err
+  }
 })

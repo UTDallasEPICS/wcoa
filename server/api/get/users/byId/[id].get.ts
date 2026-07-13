@@ -13,9 +13,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const user = await prisma.user.findUnique({
+  // Soft delete (issue #27): an archived user must not resolve here — active
+  // views treat it as gone.
+  const user = await prisma.user.findFirst({
     where: {
       id,
+      deletedAt: null,
     },
   })
 

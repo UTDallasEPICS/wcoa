@@ -8,6 +8,10 @@ model Client {
 
   rides Ride[]
 
+  // Soft delete (issue #27): archived clients are hidden from active rosters
+  // but their rides remain for historical metrics.
+  deletedAt DateTime?
+
   @@map("client")
 }
 

@@ -27,6 +27,10 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Soft delete (issue #27): metrics DELIBERATELY do NOT filter deletedAt — a
+  // soft-deleted client's COMPLETED rides still count here, and the client
+  // lookup below is likewise unfiltered so an archived client's name still
+  // resolves. Historical preservation is the whole point of soft-delete.
   const topRidersRaw = await prisma.ride.groupBy({
     by: ['clientId'],
     where: {

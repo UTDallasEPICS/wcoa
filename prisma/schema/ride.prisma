@@ -26,6 +26,10 @@ model Ride {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Soft delete (issue #27): archived rides are hidden from active ride views
+  // and skipped by reminders, but preserved so historical metrics stay intact.
+  deletedAt DateTime?
+
   sentReminders SentReminder[]
 
   @@map("ride")

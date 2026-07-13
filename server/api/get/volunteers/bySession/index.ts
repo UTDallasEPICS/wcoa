@@ -13,8 +13,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const volunteer = await prisma.volunteer.findUnique({
-    where: { userId: session.user.id },
+  // Soft delete (issue #27): an archived volunteer profile is treated as gone.
+  // (Archived users are also blocked from logging in, so this is defense in depth.)
+  const volunteer = await prisma.volunteer.findFirst({
+    where: { userId: session.user.id, deletedAt: null },
     include: {
       user: true,
       reminders: true,

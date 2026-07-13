@@ -27,8 +27,10 @@ export default defineEventHandler(async (event) => {
   }
 
   // 1. Get Volunteer profile
-  const volunteer = await prisma.volunteer.findUnique({
-    where: { userId: user.id },
+  // Soft delete (issue #27): an archived volunteer must not self-assign, even
+  // with a stale session — a lookup shouldn't trust a session alone.
+  const volunteer = await prisma.volunteer.findFirst({
+    where: { userId: user.id, deletedAt: null },
     include: { user: true }
   })
 
@@ -47,8 +49,10 @@ export default defineEventHandler(async (event) => {
   }
 
   // 2. Check Ride status
-  const ride = await prisma.ride.findUnique({
-    where: { id },
+  // Soft delete (issue #27): an archived ride can't be signed up for — treat it
+  // as not found. The atomic assignment below also re-checks status.
+  const ride = await prisma.ride.findFirst({
+    where: { id, deletedAt: null },
     include: {
       client: {
         include: {
@@ -87,7 +91,7 @@ export default defineEventHandler(async (event) => {
   let updatedRide
   try {
     updatedRide = await prisma.ride.update({
-      where: { id, status: 'CREATED', volunteerId: null },
+      where: { id, status: 'CREATED', volunteerId: null, deletedAt: null },
       data: {
         volunteerId: volunteer.id,
         status: 'ASSIGNED'

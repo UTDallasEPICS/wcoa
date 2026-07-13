@@ -10,6 +10,11 @@ model Volunteer {
 
   reminders Reminder[]
 
+  // Soft delete (issue #27): archived volunteers are hidden from active rosters
+  // and excluded from notifications/reminders, but their rides remain for
+  // historical metrics.
+  deletedAt DateTime?
+
   @@map("volunteer")
 }
 

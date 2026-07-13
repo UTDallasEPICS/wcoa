@@ -8,7 +8,8 @@ Volunteer ride-scheduling platform (UTDallas EPICS): admins manage clients/volun
 
 - `pnpm dev` — dev server on :3000 (needs `.env`: `DATABASE_URL=file:./dev.db`, `BETTER_AUTH_SECRET=<anything>`; `EMAIL_*` optional — send failures are swallowed)
 - `pnpm test` — e2e suite: `nuxt prepare` → vitest builds the app and runs it against a fresh seeded `.data/test.db` (see `tests/`)
-- `npx prisma db push && npx tsx prisma/seed.ts` — reset + seed a database by hand (`DATABASE_URL` selects the file)
+- `npx prisma db push && npx tsx prisma/seed.ts` — sync + seed a database by hand (`DATABASE_URL` selects the file); the e2e harness uses this path
+- `pnpm prisma:migrate` (`prisma migrate dev`) — create/apply a migration after a schema change; `pnpm prisma:deploy` applies pending migrations (used by the Docker entrypoint in prod); `pnpm prisma:reset` drops + re-migrates + re-seeds a **dev** DB
 
 ## Testing & verification
 
@@ -26,7 +27,7 @@ Same trick works for manual dev-server verification: POST `/api/auth/email-otp/s
 
 - **Merging to `main` deploys**: CI builds and pushes the production Docker image on every push to `main` (`.github/workflows/main.yml`). All work goes through PR branches.
 - **`prod.sql` / `deploy.tar.gz` removed from the tree (issue #29)** but they remain in **git history** (purge + secret rotation still pending). `prod.sql` was a production dump with real client PII — never restore, open, or quote it from history.
-- `prisma/migrations` is gitignored (issue #33) — schema changes are applied with `db push` locally; flag migration needs in the PR until #33 is fixed.
+- `prisma/migrations` is committed (issue #33 adopted a migrations workflow): the Docker entrypoint runs `prisma migrate deploy` at startup. The `*.sql` dump-block in `.gitignore` is carved out with `!prisma/migrations/**/*.sql`, so new migration SQL is tracked while raw dumps stay ignored. After a schema change, generate a migration (`pnpm prisma:migrate`) and commit it; the e2e harness still provisions its throwaway DB with `db push`.
 - `RideStatus` enum is only `CREATED | ASSIGNED | COMPLETED` — code paths mentioning `CANCELLED` are dead/broken (issues #5, #22).
 - `sendEmail` swallows all failures (issue #25); most API routes have no auth (issue #1) — don't "fix" these in passing, they have dedicated issues.
 - Seeded ride times are relative to `new Date()` at seed time; don't assert exact timestamps in tests.

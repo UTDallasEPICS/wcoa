@@ -1,4 +1,3 @@
-import { Prisma } from '../../../../prisma/generated/client'
 import { prisma } from '../../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
@@ -11,12 +10,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Issue #23: the ride->client FK is ON DELETE RESTRICT, so deleting a client
-  // who has any rides throws P2003 and used to surface as a 500. We must not
-  // crash, and we must not destroy historical ride data (COMPLETED rides feed
-  // the metrics endpoints — this is the Data-Integrity milestone). Block the
-  // delete with a clear 409 while rides exist; only ride-less clients delete.
-  const rideCount = await prisma.ride.count({ where: { clientId: id } })
+  // Issue #23: a client with existing rides is still blocked with a clear 409
+  // (rather than crashing or orphaning). Soft delete (issue #27) preserves
+  // historical rides regardless, but keeping the block avoids archiving a client
+  // out from under their active/upcoming rides — reassign or archive those first.
+  const rideCount = await prisma.ride.count({
+    where: { clientId: id, deletedAt: null },
+  })
   if (rideCount > 0) {
     throw createError({
       statusCode: 409,
@@ -25,14 +25,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Issue #8: deleting only the Client profile left an orphaned User (role
-  // CLIENT, no profile) that crashes frontend queries reading user.client.id.
-  // Delete the underlying User instead — Client.user is onDelete: Cascade, so
-  // this removes the client row too, leaving no orphan. (Roles are singular in
-  // this app, so a User won't also hold a volunteer profile.)
-  const client = await prisma.client.findUnique({
-    where: { id },
-    select: { userId: true },
+  // Issue #8 / #27: soft-delete the underlying User AND the Client row together
+  // (roles are singular, so a User won't also hold a volunteer profile). On the
+  // user we also RELEASE the unique contact values (email -> deletedEmail,
+  // phone -> deletedPhone, then null email/phone) so a new client can reuse the
+  // same email/phone without a unique violation (decision #2). Do both writes in
+  // a transaction so we can't leave a half-archived record.
+  const client = await prisma.client.findFirst({
+    where: { id, deletedAt: null },
+    select: { userId: true, user: { select: { email: true, phone: true } } },
   })
   if (!client) {
     throw createError({
@@ -41,27 +42,26 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  try {
-    return await prisma.user.delete({
-      where: { id: client.userId },
+  const now = new Date()
+  return await prisma.$transaction(async (tx) => {
+    await tx.client.update({
+      where: { id, deletedAt: null },
+      data: { deletedAt: now },
     })
-  } catch (err) {
-    // Race-safe fallback: a ride could be created between the count and the
-    // delete. We now delete the User, whose cascade to the client row is what
-    // trips the ride->client RESTRICT FK. Empirically (better-sqlite3 adapter)
-    // this surfaces as P2003; we also accept P2014 (required-relation
-    // violation) defensively so a driver quirk can't leak a 500. Treat both as
-    // the same 409 block.
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      (err.code === 'P2003' || err.code === 'P2014')
-    ) {
-      throw createError({
-        statusCode: 409,
-        statusMessage:
-          'Cannot delete a client with existing rides — reassign or archive them first',
-      })
-    }
-    throw err
-  }
+    const updated = await tx.user.update({
+      where: { id: client.userId, deletedAt: null },
+      data: {
+        deletedAt: now,
+        deletedEmail: client.user.email,
+        deletedPhone: client.user.phone,
+        email: null,
+        phone: null,
+      },
+    })
+    // Revoke sessions (issue #27, decision #1): a hard delete used to cascade to
+    // the session table and log the user out. Soft delete must do the same
+    // explicitly, or an archived client's live cookie would keep API access.
+    await tx.session.deleteMany({ where: { userId: client.userId } })
+    return updated
+  })
 })
