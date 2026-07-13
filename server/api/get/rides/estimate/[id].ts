@@ -19,8 +19,9 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
     })
   }
 
-  const ride = await prisma.ride.findUnique({
-    where: { id },
+  // Soft delete (issue #27): an archived ride is treated as not found.
+  const ride = await prisma.ride.findFirst({
+    where: { id, deletedAt: null },
     select: {
       pickupDisplay: true,
       dropoffDisplay: true,
@@ -29,7 +30,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
       cachedDurationText: true,
       cachedDurationValue: true,
       estimatedAt: true,
-    }
+    },
   })
 
   if (!ride) {

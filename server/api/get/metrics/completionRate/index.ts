@@ -10,6 +10,9 @@ export default defineEventHandler(async (event) => {
   const range = parseDateRange(query.startDate, query.endDate)
   const dateFilter = range ? { scheduledTime: range } : {}
 
+  // Soft delete (issue #27): metrics DELIBERATELY do NOT filter deletedAt —
+  // soft-deleted rides must still count so historical completion rate is
+  // preserved. Preserving history is the entire point of soft-delete here.
   const totalRides = await prisma.ride.count({
     where: dateFilter
   })

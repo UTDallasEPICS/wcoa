@@ -32,5 +32,8 @@ logs
 *.sqlite
 *.tar.gz
 
+# Personal AI-tool config (issue #34)
+.gemini/
+
 # …but DO commit Prisma migration SQL — it's schema history, not a data dump (issue #33)
 !prisma/migrations/**/*.sql

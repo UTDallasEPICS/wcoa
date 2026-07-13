@@ -9,6 +9,18 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Soft delete (issue #27): a non-null deletedAt marks the row as archived —
+  // hidden from active views but preserved for historical metrics.
+  deletedAt DateTime?
+
+  // On soft delete we RELEASE the unique contact values: copy email -> deletedEmail
+  // and phone -> deletedPhone, then null out email/phone. This frees the unique
+  // slots so the same email/phone can be reused by a new record without tripping
+  // @@unique([email]) / phone @unique (SQLite allows many NULLs under a unique
+  // index). These columns preserve the original values for audit/recovery.
+  deletedEmail String?
+  deletedPhone String?
+
   sessions  Session[]
   volunteer Volunteer?
   client    Client?

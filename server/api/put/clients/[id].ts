@@ -11,8 +11,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const client = await prisma.client.findUnique({
-    where: { id },
+  // Soft delete (issue #27): an archived client can't be edited — treat as 404.
+  const client = await prisma.client.findFirst({
+    where: { id, deletedAt: null },
   })
 
   if (!client) {

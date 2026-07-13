@@ -2,7 +2,6 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { prisma } from './prisma'
 import { emailOTP } from 'better-auth/plugins/email-otp'
-import nodemailer from 'nodemailer'
 import { createAuthMiddleware, APIError } from 'better-auth/api'
 import { sendEmail } from './email'
 
@@ -40,14 +39,6 @@ export function resolveTrustedOrigins(
   return [...new Set(origins)]
 }
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-})
-
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'sqlite',
@@ -82,7 +73,15 @@ export const auth = betterAuth({
       // auth middleware which would reject this pre-session call). See #20.
       const email = ctx.body?.email
       if (!email) return
-      const user = await prisma.user.findUnique({ where: { email } })
+      // Soft delete (issue #27, decision #1): archived users are BLOCKED from
+      // logging in. On soft delete we also null the user's email (releasing it
+      // for reuse), so a lookup on the live email column already excludes them;
+      // the explicit deletedAt: null guard makes the intent unmistakable and is
+      // robust even if a future change stops releasing the email. No OTP is
+      // issued for a missing/archived user, so the OTP flow can never complete.
+      const user = await prisma.user.findFirst({
+        where: { email, deletedAt: null },
+      })
       if (!user) {
         throw new APIError('BAD_REQUEST', {
           message: 'Contact admin to add your user to the system first',
