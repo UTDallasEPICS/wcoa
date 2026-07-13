@@ -2,7 +2,6 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { prisma } from './prisma'
 import { emailOTP } from 'better-auth/plugins/email-otp'
-import nodemailer from 'nodemailer'
 import { createAuthMiddleware, APIError } from 'better-auth/api'
 import { sendEmail } from './email'
 
@@ -39,14 +38,6 @@ export function resolveTrustedOrigins(
 
   return [...new Set(origins)]
 }
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-})
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
