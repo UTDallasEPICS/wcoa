@@ -19,11 +19,12 @@ export default defineEventHandler(async (event) => {
     zip: string
   }) => {
     // Normalize before the upsert so case/whitespace-variant addresses collapse
-    // onto the @@unique([street, city, state, zip]) key (issue #16).
+    // onto the unique matchKey (issues #16, #57). Display fields keep original
+    // casing; only matchKey is lowercased for dedup.
     const normalized = normalizeAddress(addr)
     return await prisma.address.upsert({
       where: {
-        street_city_state_zip: normalized,
+        matchKey: normalized.matchKey,
       },
       update: {},
       create: normalized,

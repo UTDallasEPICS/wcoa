@@ -40,8 +40,8 @@ export default defineEventHandler(async (event) => {
 
   // 2. Upsert Address
   // Normalize first so case/whitespace-variant addresses collapse onto the
-  // @@unique([street, city, state, zip]) key instead of spawning duplicate
-  // rows (issue #16).
+  // unique matchKey instead of spawning duplicate rows (issues #16, #57). The
+  // display fields keep the user's original casing; only matchKey is lossy.
   const addressData = normalizeAddress({
     street: body.street,
     city: body.city,
@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
 
   const address = await prisma.address.upsert({
     where: {
-      street_city_state_zip: addressData
+      matchKey: addressData.matchKey
     },
     update: {},
     create: addressData

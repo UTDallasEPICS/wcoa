@@ -1,4 +1,10 @@
 import { prisma } from '../server/utils/prisma'
+import { normalizeAddress } from '../server/utils/address'
+
+// Build the create payload (incl. the #57 matchKey) the same way the API does.
+function addr(street: string, city: string, state: string, zip: string) {
+  return { data: normalizeAddress({ street, city, state, zip }) }
+}
 
 async function main() {
   console.log('--- Cleaning Database ---')
@@ -12,13 +18,13 @@ async function main() {
   console.log('--- Seeding North Texas Addresses ---')
 
   const addresses = await Promise.all([
-    prisma.address.create({ data: { street: '1501 H Avenue', city: 'Plano', state: 'TX', zip: '75074' } }),
-    prisma.address.create({ data: { street: '2831 E President George Bush Hwy', city: 'Richardson', state: 'TX', zip: '75082' } }),
-    prisma.address.create({ data: { street: '9 Cowboys Way', city: 'Frisco', state: 'TX', zip: '75034' } }),
-    prisma.address.create({ data: { street: '2100 Ave K', city: 'Plano', state: 'TX', zip: '75074' } }),
-    prisma.address.create({ data: { street: '800 W Campbell Rd', city: 'Richardson', state: 'TX', zip: '75080' } }),
-    prisma.address.create({ data: { street: '1600 Amphitheatre Pkwy', city: 'Mountain View', state: 'CA', zip: '94043' } }),
-    prisma.address.create({ data: { street: '6001 W Plano Pkwy', city: 'Plano', state: 'TX', zip: '75093' } }),
+    prisma.address.create(addr('1501 H Avenue', 'Plano', 'TX', '75074')),
+    prisma.address.create(addr('2831 E President George Bush Hwy', 'Richardson', 'TX', '75082')),
+    prisma.address.create(addr('9 Cowboys Way', 'Frisco', 'TX', '75034')),
+    prisma.address.create(addr('2100 Ave K', 'Plano', 'TX', '75074')),
+    prisma.address.create(addr('800 W Campbell Rd', 'Richardson', 'TX', '75080')),
+    prisma.address.create(addr('1600 Amphitheatre Pkwy', 'Mountain View', 'CA', '94043')),
+    prisma.address.create(addr('6001 W Plano Pkwy', 'Plano', 'TX', '75093')),
   ])
 
   console.log('--- Seeding Users & Profiles ---')
