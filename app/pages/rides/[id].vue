@@ -14,6 +14,7 @@
   const isEditModalOpen = ref(false)
   const isCompleteModalOpen = ref(false)
   const isDeleteModalOpen = ref(false)
+  const isCancelModalOpen = ref(false)
 
   const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
   const isVolunteer = computed(() => session.value?.user?.role === 'VOLUNTEER')
@@ -138,6 +139,20 @@
     }
   }
 
+  async function handleCancel() {
+    try {
+      await $fetch(`/api/put/rides/${id}`, {
+        method: 'PUT',
+        body: { status: 'CANCELLED' },
+      })
+      toast.add({ title: 'Success', description: 'Ride cancelled', color: 'success' })
+      isCancelModalOpen.value = false
+      await refreshRide()
+    } catch (err) {
+      toast.add({ title: 'Error', description: 'Failed to cancel ride', color: 'error' })
+    }
+  }
+
   async function handleVolunteerAction(action: 'signup' | 'unsignup' | 'complete') {
     if (action === 'signup') {
       try {
@@ -222,7 +237,16 @@
           <template #header>
             <div class="flex items-center justify-between">
               <h2 class="text-xl font-bold">Ride Information</h2>
-              <UBadge :color="ride.status === 'COMPLETED' ? 'success' : 'info'" variant="subtle">
+              <UBadge
+                :color="
+                  ride.status === 'COMPLETED'
+                    ? 'success'
+                    : ride.status === 'CANCELLED'
+                      ? 'error'
+                      : 'info'
+                "
+                variant="subtle"
+              >
                 {{ ride.status }}
               </UBadge>
             </div>
@@ -285,6 +309,14 @@
                 variant="subtle"
                 class="flex-1 justify-center"
                 @click="isEditModalOpen = true"
+              />
+              <UButton
+                v-if="isAdmin && ride.status !== 'CANCELLED' && ride.status !== 'COMPLETED'"
+                label="Cancel Ride"
+                icon="i-lucide-ban"
+                color="warning"
+                variant="subtle"
+                @click="isCancelModalOpen = true"
               />
               <UButton
                 v-if="isAdmin"
@@ -524,6 +556,27 @@
               @click="isDeleteModalOpen = false"
             />
             <UButton label="Delete" color="error" @click="handleDelete" />
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Cancel Ride Confirmation Modal -->
+    <UModal v-model:open="isCancelModalOpen" title="Cancel Ride">
+      <template #content>
+        <div class="space-y-4 p-4">
+          <p>
+            Are you sure you want to cancel this ride? The assigned volunteer (if any) will be
+            notified.
+          </p>
+          <div class="flex justify-end gap-2">
+            <UButton
+              label="Keep Ride"
+              color="neutral"
+              variant="ghost"
+              @click="isCancelModalOpen = false"
+            />
+            <UButton label="Cancel Ride" color="warning" @click="handleCancel" />
           </div>
         </div>
       </template>

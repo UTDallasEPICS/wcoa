@@ -297,6 +297,7 @@
             CREATED: 'info' as const,
             ASSIGNED: 'warning' as const,
             COMPLETED: 'success' as const,
+            CANCELLED: 'error' as const,
           }[row.getValue('status') as string] || 'neutral'
 
         return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>

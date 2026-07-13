@@ -18,15 +18,18 @@ export const BASE_FILTER_OPTIONS: RideFilter[] = [
   { label: 'Created', value: 'status:CREATED' },
   { label: 'Assigned', value: 'status:ASSIGNED' },
   { label: 'Completed', value: 'status:COMPLETED' },
+  { label: 'Cancelled', value: 'status:CANCELLED' },
 ]
 
 /**
- * Default excluded filters for new users. Only excludes Completed rides, which
- * is a valid, toggleable option. The stale `status:CANCELLED` default has been
- * removed (issue #22) because there is no CANCELLED status to toggle it off.
+ * Default excluded filters for new users. Excludes finished rides (Completed and
+ * Cancelled) so the dashboard defaults to active work. Both are valid, toggleable
+ * options in BASE_FILTER_OPTIONS, so a user can always turn the exclusion off
+ * (unlike the pre-#5 stale `status:CANCELLED` default, which had no toggle — #22).
  */
 export const DEFAULT_EXCLUDED_FILTERS: RideFilter[] = [
   { label: 'Completed', value: 'status:COMPLETED' },
+  { label: 'Cancelled', value: 'status:CANCELLED' },
 ]
 
 /**

@@ -23,14 +23,26 @@ describe('ride filter helpers (#22)', () => {
     expect(DEFAULT_EXCLUDED_FILTERS.map((f) => f.value)).toContain('status:COMPLETED')
   })
 
-  it('strips the stale status:CANCELLED entry but keeps valid ones', () => {
+  it('keeps status:CANCELLED now that it is a real, toggleable status (#5)', () => {
+    // CANCELLED became a first-class RideStatus in #5, so it is a valid filter
+    // value and must survive sanitize (it is no longer the stuck-filter bug #22).
+    expect(validValues).toContain('status:CANCELLED')
     const saved = [
       { label: 'Completed', value: 'status:COMPLETED' },
       { label: 'Cancelled', value: 'status:CANCELLED' },
     ]
     const result = sanitizeSavedFilters(saved, validValues)
+    expect(result.map((f) => f.value)).toEqual(['status:COMPLETED', 'status:CANCELLED'])
+  })
+
+  it('strips a genuinely stale/unknown saved filter but keeps valid ones', () => {
+    const saved = [
+      { label: 'Completed', value: 'status:COMPLETED' },
+      { label: 'Bogus', value: 'status:BOGUS' },
+    ]
+    const result = sanitizeSavedFilters(saved, validValues)
     expect(result.map((f) => f.value)).toEqual(['status:COMPLETED'])
-    expect(result.map((f) => f.value)).not.toContain('status:CANCELLED')
+    expect(result.map((f) => f.value)).not.toContain('status:BOGUS')
   })
 
   it('keeps runtime-valid values that are passed in validValues (e.g. assign:ME)', () => {
