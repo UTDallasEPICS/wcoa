@@ -11,8 +11,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const volunteer = await prisma.volunteer.findUnique({
-    where: { id },
+  // Soft delete (issue #27): an archived volunteer can't be edited — treat as 404.
+  const volunteer = await prisma.volunteer.findFirst({
+    where: { id, deletedAt: null },
   })
 
   if (!volunteer) {

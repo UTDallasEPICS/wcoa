@@ -18,11 +18,15 @@ export default defineEventHandler(async (event) => {
   // Fail closed: if the user id is somehow absent, never widen past available
   // rides — { volunteer: { userId: undefined } } would make Prisma drop the
   // filter and match every assigned ride, leaking PII.
-  let where: Prisma.RideWhereInput | undefined
+  // Soft delete (issue #27): archived rides are always hidden from active ride
+  // views (both admin and volunteer). The scoping filter below is ANDed on top.
+  const where: Prisma.RideWhereInput = { deletedAt: null }
   if (role !== 'ADMIN') {
-    where = userId
-      ? { OR: [{ status: 'CREATED' }, { volunteer: { userId } }] }
-      : { status: 'CREATED' }
+    Object.assign(where, {
+      OR: userId
+        ? [{ status: 'CREATED' }, { volunteer: { userId } }]
+        : [{ status: 'CREATED' }],
+    })
   }
 
   return await prisma.ride.findMany({

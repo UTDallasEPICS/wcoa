@@ -5,9 +5,11 @@ export default defineEventHandler(async (event) => {
   // an admin-only page (volunteers are redirected by the route guard).
   requireAdmin(event)
 
+  // Soft delete (issue #27): hide archived admins from the active roster.
   return await prisma.user.findMany({
     where: {
       role: 'ADMIN',
+      deletedAt: null,
     },
     orderBy: {
       name: 'asc',

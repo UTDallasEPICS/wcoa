@@ -13,9 +13,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const user = await prisma.user.findUnique({
+  // Soft delete (issue #27): archived users have their email released to null
+  // (moved to deletedEmail), so a findFirst on the live email column already
+  // excludes them; the explicit deletedAt: null guard makes that intent clear.
+  const user = await prisma.user.findFirst({
     where: {
       email,
+      deletedAt: null,
     },
   })
 
