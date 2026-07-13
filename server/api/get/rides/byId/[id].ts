@@ -10,8 +10,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const ride = await prisma.ride.findUnique({
-    where: { id },
+  // Soft delete (issue #27): an archived ride is treated as gone — findFirst
+  // with deletedAt: null yields null, and the scoping below turns that into a 404.
+  const ride = await prisma.ride.findFirst({
+    where: { id, deletedAt: null },
     include: {
       client: {
         include: {

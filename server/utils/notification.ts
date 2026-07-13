@@ -32,8 +32,9 @@ export async function sendNotification(
   }
 
   // 2. Fetch Volunteer Preferences
-  const volunteer = await prisma.volunteer.findUnique({
-    where: { id: volunteerId },
+  // Soft delete (issue #27): never notify an archived volunteer.
+  const volunteer = await prisma.volunteer.findFirst({
+    where: { id: volunteerId, deletedAt: null },
     include: { user: true },
   })
 
@@ -76,9 +77,10 @@ export async function broadcastNotification(
   // for #32. No-op in production (see maybeFault).
   maybeFault('ride-broadcast', event)
 
-  // Fetch all available volunteers
+  // Fetch all available volunteers.
+  // Soft delete (issue #27): skip archived volunteers in the broadcast.
   const volunteers = await prisma.volunteer.findMany({
-    where: { status: 'AVAILABLE' },
+    where: { status: 'AVAILABLE', deletedAt: null },
   })
 
   // Send to all in parallel (sendNotification handles individual preferences).
