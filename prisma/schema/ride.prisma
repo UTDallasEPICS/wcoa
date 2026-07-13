@@ -23,6 +23,17 @@ model Ride {
   totalRideTime Float?   // Actual duration in hours (e.g. 1.5)
   notes         String? // Essential for Admin instructions to Volunteer
 
+  // --- MAPS ESTIMATE CACHE (issue #14) ---
+  // Cached Google Maps Directions estimate for the current pickup/dropoff.
+  // Populated on the first cache-miss API call and served thereafter to avoid
+  // repeated live Directions requests (quota drain / billing). Invalidated
+  // (set back to null) whenever pickupDisplay/dropoffDisplay changes.
+  cachedDistanceText  String? // e.g. "12.3 mi"
+  cachedDistanceValue Int? // meters
+  cachedDurationText  String? // e.g. "18 mins"
+  cachedDurationValue Int? // seconds
+  estimatedAt         DateTime? // when the cache was last populated
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
