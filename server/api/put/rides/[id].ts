@@ -154,6 +154,19 @@ export default defineEventHandler(async (event) => {
     },
   })
 
+  // Audit (issue #28): record ride lifecycle transitions (cancel/complete/
+  // assign/unassign) after the update succeeds. Action reflects the new status
+  // (e.g. RIDE_CANCELLED, RIDE_COMPLETED) so the log reads meaningfully; details
+  // keep only the from/to, never the full ride record.
+  if (ride.status !== existingRide.status) {
+    await writeAuditLog(event, {
+      action: `RIDE_${ride.status}`,
+      targetType: 'Ride',
+      targetId: ride.id,
+      details: { from: existingRide.status, to: ride.status },
+    })
+  }
+
   // Notifications
   const scheduledTime = new Date(ride.scheduledTime)
   const commonContext = {

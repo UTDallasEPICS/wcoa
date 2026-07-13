@@ -16,10 +16,17 @@ export default defineEventHandler(async (event) => {
   // metrics. Guard on deletedAt: null so a second delete of an already-archived
   // ride 404s (P2025) rather than silently re-archiving.
   try {
-    return await prisma.ride.update({
+    const archived = await prisma.ride.update({
       where: { id, deletedAt: null },
       data: { deletedAt: new Date() },
     })
+    // Audit (issue #28): record the archival (soft delete).
+    await writeAuditLog(event, {
+      action: 'RIDE_DELETED',
+      targetType: 'Ride',
+      targetId: id,
+    })
+    return archived
   } catch (err) {
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&

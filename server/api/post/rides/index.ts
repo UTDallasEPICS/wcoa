@@ -51,6 +51,14 @@ export default defineEventHandler(async (event) => {
     },
   })
 
+  // Audit (issue #28): record the ride creation after it succeeds.
+  await writeAuditLog(event, {
+    action: 'RIDE_CREATED',
+    targetType: 'Ride',
+    targetId: ride.id,
+    details: { clientId: ride.clientId, status: ride.status },
+  })
+
   // Notify all volunteers
   const scheduledTime = new Date(body.scheduledTime)
 

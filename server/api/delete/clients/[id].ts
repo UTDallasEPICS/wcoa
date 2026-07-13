@@ -43,12 +43,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const now = new Date()
-  return await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     await tx.client.update({
       where: { id, deletedAt: null },
       data: { deletedAt: now },
     })
-    const updated = await tx.user.update({
+    const u = await tx.user.update({
       where: { id: client.userId, deletedAt: null },
       data: {
         deletedAt: now,
@@ -62,6 +62,16 @@ export default defineEventHandler(async (event) => {
     // the session table and log the user out. Soft delete must do the same
     // explicitly, or an archived client's live cookie would keep API access.
     await tx.session.deleteMany({ where: { userId: client.userId } })
-    return updated
+    return u
   })
+
+  // Audit (issue #28): record the archival after the transaction commits.
+  await writeAuditLog(event, {
+    action: 'CLIENT_DELETED',
+    targetType: 'Client',
+    targetId: id,
+    details: { userId: client.userId },
+  })
+
+  return updated
 })
