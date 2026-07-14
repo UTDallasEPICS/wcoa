@@ -154,16 +154,32 @@ export default defineEventHandler(async (event) => {
     },
   })
 
-  // Audit (issue #28): record ride lifecycle transitions (cancel/complete/
-  // assign/unassign) after the update succeeds. Action reflects the new status
-  // (e.g. RIDE_CANCELLED, RIDE_COMPLETED) so the log reads meaningfully; details
-  // keep only the from/to, never the full ride record.
-  if (ride.status !== existingRide.status) {
+  // Audit (issue #28): record ride lifecycle transitions after the update
+  // succeeds. A volunteer change is logged as RIDE_ASSIGNED/RIDE_UNASSIGNED so
+  // it stays distinct from a genuine status transition — otherwise an admin
+  // unassigning a volunteer (which auto-resets status to CREATED, see above)
+  // would log RIDE_CREATED and collide with actual ride creation in the trail.
+  // Pure status changes (cancel/complete) log RIDE_<status>. details keep only
+  // the from/to, never the full ride record.
+  const statusChanged = ride.status !== existingRide.status
+  const volunteerChanged = ride.volunteerId !== existingRide.volunteerId
+  if (statusChanged || volunteerChanged) {
+    const action = volunteerChanged
+      ? ride.volunteerId === null
+        ? 'RIDE_UNASSIGNED'
+        : 'RIDE_ASSIGNED'
+      : `RIDE_${ride.status}`
     await writeAuditLog(event, {
-      action: `RIDE_${ride.status}`,
+      action,
       targetType: 'Ride',
       targetId: ride.id,
-      details: { from: existingRide.status, to: ride.status },
+      details: {
+        from: existingRide.status,
+        to: ride.status,
+        ...(volunteerChanged
+          ? { fromVolunteerId: existingRide.volunteerId, toVolunteerId: ride.volunteerId }
+          : {}),
+      },
     })
   }
 
