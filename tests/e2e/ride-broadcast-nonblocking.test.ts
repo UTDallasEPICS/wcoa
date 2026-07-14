@@ -21,9 +21,10 @@ async function adminCookie() {
 }
 
 async function firstClientId(cookie: string): Promise<string> {
-  const clients = await $fetch<Array<{ id: string }>>('/api/get/clients', {
-    headers: { cookie },
-  })
+  const { items: clients } = await $fetch<{ items: Array<{ id: string }> }>(
+    '/api/get/clients?pageSize=100',
+    { headers: { cookie } }
+  )
   expect(clients.length).toBeGreaterThan(0)
   return clients[0]!.id
 }

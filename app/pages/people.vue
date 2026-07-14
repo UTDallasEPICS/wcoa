@@ -10,17 +10,63 @@
 
   const { data: session } = await authClient.useSession(useFetch)
 
-  // --- Data Fetching ---
-  const { data: volunteers, refresh: refreshVolunteers } = await useFetch('/api/get/volunteers')
-  const { data: clients, refresh: refreshClients } = await useFetch('/api/get/clients')
-  const { data: admins, refresh: refreshAdmins } = await useFetch('/api/get/admins')
-
   // --- State ---
   const activeTab = ref('volunteers')
   const search = ref('')
   const volunteerStatusFilter = ref('All')
 
   const volunteerStatusOptions = ['All', 'AVAILABLE', 'UNAVAILABLE']
+
+  // --- Server-side pagination + search (issue #13) ---
+  // The roster endpoints are paginated, and search / status filtering now run on
+  // the server so they compose with pagination (client-side filtering would only
+  // filter the current page). Search is debounced and shared across the tabs.
+  const PAGE_SIZE = 20
+  const volunteerPage = ref(1)
+  const clientPage = ref(1)
+  const adminPage = ref(1)
+
+  const debouncedSearch = ref('')
+  const applyDebouncedSearch = debounce((value: string) => {
+    debouncedSearch.value = value
+  }, 300)
+  watch(search, (value) => applyDebouncedSearch(value))
+
+  const searchParam = computed(() => debouncedSearch.value || undefined)
+
+  // --- Data Fetching (reactive query -> auto refetch on page/search change) ---
+  const { data: volunteersData, refresh: refreshVolunteers } = await useFetch('/api/get/volunteers', {
+    query: {
+      page: volunteerPage,
+      pageSize: PAGE_SIZE,
+      search: searchParam,
+      status: computed(() =>
+        volunteerStatusFilter.value !== 'All' ? volunteerStatusFilter.value : undefined
+      ),
+    },
+  })
+  const { data: clientsData, refresh: refreshClients } = await useFetch('/api/get/clients', {
+    query: { page: clientPage, pageSize: PAGE_SIZE, search: searchParam },
+  })
+  const { data: adminsData, refresh: refreshAdmins } = await useFetch('/api/get/admins', {
+    query: { page: adminPage, pageSize: PAGE_SIZE, search: searchParam },
+  })
+
+  const volunteers = computed(() => volunteersData.value?.items ?? [])
+  const clients = computed(() => clientsData.value?.items ?? [])
+  const admins = computed(() => adminsData.value?.items ?? [])
+  const volunteerTotal = computed(() => volunteersData.value?.total ?? 0)
+  const clientTotal = computed(() => clientsData.value?.total ?? 0)
+  const adminTotal = computed(() => adminsData.value?.total ?? 0)
+
+  // Any query change returns the affected tab to page 1.
+  watch([debouncedSearch, volunteerStatusFilter], () => {
+    volunteerPage.value = 1
+  })
+  watch(debouncedSearch, () => {
+    clientPage.value = 1
+    adminPage.value = 1
+  })
 
   // --- Schemas ---
   const volunteerSchema = z.object({
@@ -99,43 +145,8 @@
     },
   })
 
-  // --- Computed ---
-  const filteredVolunteers = computed(() => {
-    if (!volunteers.value) return []
-
-    let result = volunteers.value
-
-    // Status Filter
-    if (volunteerStatusFilter.value !== 'All') {
-      result = result.filter((v: any) => v.status === volunteerStatusFilter.value)
-    }
-
-    // Search Filter
-    if (search.value) {
-      const q = search.value.toLowerCase()
-      result = result.filter(
-        (v: any) => v.user.name.toLowerCase().includes(q) || (v.user.email?.toLowerCase().includes(q) ?? false)
-      )
-    }
-
-    return result
-  })
-
-  const filteredClients = computed(() => {
-    if (!clients.value) return []
-    const q = search.value.toLowerCase()
-    return clients.value.filter(
-      (c: any) => c.user.name.toLowerCase().includes(q) || (c.user.email?.toLowerCase().includes(q) ?? false)
-    )
-  })
-
-  const filteredAdmins = computed(() => {
-    if (!admins.value) return []
-    const q = search.value.toLowerCase()
-    return admins.value.filter(
-      (a: any) => a.name.toLowerCase().includes(q) || (a.email?.toLowerCase().includes(q) ?? false)
-    )
-  })
+  // Search / status filtering is applied server-side (issue #13) so it composes
+  // with pagination; the tables bind directly to the returned page.
 
   const items = [
     {
@@ -491,13 +502,34 @@
 
     <UTabs v-model="activeTab" :items="items" class="w-full">
       <template #volunteers>
-        <UTable :data="filteredVolunteers" :columns="volunteerColumns" class="mt-4" />
+        <UTable :data="volunteers" :columns="volunteerColumns" class="mt-4" />
+        <div v-if="volunteerTotal > PAGE_SIZE" class="mt-4 flex justify-end">
+          <UPagination
+            v-model:page="volunteerPage"
+            :total="volunteerTotal"
+            :items-per-page="PAGE_SIZE"
+          />
+        </div>
       </template>
       <template #clients>
-        <UTable :data="filteredClients" :columns="clientColumns" class="mt-4" />
+        <UTable :data="clients" :columns="clientColumns" class="mt-4" />
+        <div v-if="clientTotal > PAGE_SIZE" class="mt-4 flex justify-end">
+          <UPagination
+            v-model:page="clientPage"
+            :total="clientTotal"
+            :items-per-page="PAGE_SIZE"
+          />
+        </div>
       </template>
       <template #admins>
-        <UTable :data="filteredAdmins" :columns="adminColumns" class="mt-4" />
+        <UTable :data="admins" :columns="adminColumns" class="mt-4" />
+        <div v-if="adminTotal > PAGE_SIZE" class="mt-4 flex justify-end">
+          <UPagination
+            v-model:page="adminPage"
+            :total="adminTotal"
+            :items-per-page="PAGE_SIZE"
+          />
+        </div>
       </template>
     </UTabs>
 

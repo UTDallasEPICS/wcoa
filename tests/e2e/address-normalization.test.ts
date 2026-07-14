@@ -26,10 +26,10 @@ async function createRide(cookie: string, street: string) {
     headers: { cookie },
     body: {
       clientId: (
-        await $fetch<Array<{ id: string }>>('/api/get/clients', {
+        await $fetch<{ items: Array<{ id: string }> }>('/api/get/clients?pageSize=100', {
           headers: { cookie },
         })
-      )[0]!.id,
+      ).items[0]!.id,
       pickup: { street, city: 'Dallas', state: 'TX', zip: '75080' },
       dropoff: { street: '999 Dropoff Rd', city: 'Dallas', state: 'TX', zip: '75080' },
       scheduledTime: new Date(Date.now() + 86_400_000).toISOString(),

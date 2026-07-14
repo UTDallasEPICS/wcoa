@@ -36,9 +36,10 @@ describe('admin delete route param (#6)', () => {
 
     // Confirm it is actually gone: it must no longer appear in the roster and a
     // second delete must fail (record not found).
-    const admins = await $fetch<Array<{ id: string }>>('/api/get/admins', {
-      headers: { cookie },
-    })
+    const { items: admins } = await $fetch<{ items: Array<{ id: string }> }>(
+      '/api/get/admins?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(admins.some((a) => a.id === created.id)).toBe(false)
 
     await expect(

@@ -8,9 +8,13 @@ await bootShared()
 describe('test harness smoke test', () => {
   it('boots the app and serves seeded data (authenticated)', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const rides = await $fetch('/api/get/rides', { headers: { cookie } })
-    expect(Array.isArray(rides)).toBe(true)
-    expect(rides.length).toBeGreaterThanOrEqual(9)
+    // /api/get/rides returns a paginated envelope (issue #13).
+    const rides = await $fetch<{ items: unknown[]; total: number }>(
+      '/api/get/rides?pageSize=100',
+      { headers: { cookie } }
+    )
+    expect(Array.isArray(rides.items)).toBe(true)
+    expect(rides.total).toBeGreaterThanOrEqual(9)
   })
 
   it('logs in via the OTP-from-database helper and reaches an auth-gated endpoint', async () => {

@@ -98,9 +98,9 @@ describe('issue #8 — deletion removes the parent User (no orphans)', () => {
   it('deleting a client WITH rides still 409s and leaves client + user intact (#23)', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
 
-    const clients = await $fetch<
-      Array<{ id: string; userId: string; user: { email: string | null } }>
-    >('/api/get/clients', { headers: { cookie } })
+    const { items: clients } = await $fetch<{
+      items: Array<{ id: string; userId: string; user: { email: string | null } }>
+    }>('/api/get/clients?pageSize=100', { headers: { cookie } })
     const martha = clients.find((c) => c.user.email === 'martha@example.com')
     expect(martha, 'seeded client martha should exist').toBeDefined()
 
@@ -112,8 +112,8 @@ describe('issue #8 — deletion removes the parent User (no orphans)', () => {
     ).rejects.toMatchObject({ statusCode: 409 })
 
     // Both the client profile and its user remain.
-    const clientsAfter = await $fetch<Array<{ id: string }>>(
-      '/api/get/clients',
+    const { items: clientsAfter } = await $fetch<{ items: Array<{ id: string }> }>(
+      '/api/get/clients?pageSize=100',
       { headers: { cookie } }
     )
     expect(clientsAfter.some((c) => c.id === martha!.id)).toBe(true)
@@ -136,8 +136,8 @@ describe('issue #8 — deletion removes the parent User (no orphans)', () => {
     )
 
     // Grab a seeded CREATED ride and assign it to this volunteer.
-    const rides = await $fetch<Array<{ id: string; status: string }>>(
-      '/api/get/rides',
+    const { items: rides } = await $fetch<{ items: Array<{ id: string; status: string }> }>(
+      '/api/get/rides?pageSize=100',
       { headers: { cookie } }
     )
     const openRide = rides.find((r) => r.status === 'CREATED')
@@ -155,8 +155,8 @@ describe('issue #8 — deletion removes the parent User (no orphans)', () => {
     })
 
     // Ride reset back to CREATED (available pool), User gone.
-    const ridesAfter = await $fetch<Array<{ id: string; status: string }>>(
-      '/api/get/rides',
+    const { items: ridesAfter } = await $fetch<{ items: Array<{ id: string; status: string }> }>(
+      '/api/get/rides?pageSize=100',
       { headers: { cookie } }
     )
     const ride = ridesAfter.find((r) => r.id === openRide!.id)

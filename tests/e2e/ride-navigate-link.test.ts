@@ -16,9 +16,9 @@ describe('ride details Navigate deep-link (#26)', () => {
   it('renders a maps directions deep-link with encoded pickup/dropoff', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
 
-    const rides = await $fetch<
-      Array<{ id: string; pickupDisplay: string; dropoffDisplay: string }>
-    >('/api/get/rides', { headers: { cookie } })
+    const { items: rides } = await $fetch<{
+      items: Array<{ id: string; pickupDisplay: string; dropoffDisplay: string }>
+    }>('/api/get/rides?pageSize=100', { headers: { cookie } })
     expect(rides.length).toBeGreaterThan(0)
 
     const ride = rides[0]!

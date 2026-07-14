@@ -22,14 +22,22 @@ await bootShared()
 describe('order-dependence: seed-dependent victim', () => {
   it('still sees the seeded rides even though an earlier file deleted them all', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const rides = await $fetch<unknown[]>('/api/get/rides', { headers: { cookie } })
+    const { items: rides } = await $fetch<{ items: unknown[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie },
+    })
     expect(rides.length).toBeGreaterThanOrEqual(9)
   })
 
   it('restores seeded clients and volunteers too', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const clients = await $fetch<unknown[]>('/api/get/clients', { headers: { cookie } })
-    const volunteers = await $fetch<unknown[]>('/api/get/volunteers', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: unknown[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
+    const { items: volunteers } = await $fetch<{ items: unknown[] }>(
+      '/api/get/volunteers?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(clients.length).toBeGreaterThanOrEqual(3)
     expect(volunteers.length).toBeGreaterThanOrEqual(3)
   })

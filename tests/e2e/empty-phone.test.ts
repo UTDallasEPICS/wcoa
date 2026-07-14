@@ -16,9 +16,10 @@ type VolunteerWithUser = {
 }
 
 async function getVolunteer(cookie: string, email: string): Promise<VolunteerWithUser> {
-  const volunteers = await $fetch<VolunteerWithUser[]>('/api/get/volunteers', {
-    headers: { cookie },
-  })
+  const { items: volunteers } = await $fetch<{ items: VolunteerWithUser[] }>(
+    '/api/get/volunteers?pageSize=100',
+    { headers: { cookie } }
+  )
   const v = volunteers.find((v) => v.user.email === email)
   expect(v, `seeded volunteer ${email} should exist`).toBeTruthy()
   return v!

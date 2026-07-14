@@ -14,9 +14,10 @@ async function adminCookie() {
 }
 
 async function firstRideId(cookie: string): Promise<string> {
-  const rides = await $fetch<Array<{ id: string }>>('/api/get/rides', {
-    headers: { cookie },
-  })
+  const { items: rides } = await $fetch<{ items: Array<{ id: string }> }>(
+    '/api/get/rides?pageSize=100',
+    { headers: { cookie } }
+  )
   expect(rides.length).toBeGreaterThan(0)
   return rides[0]!.id
 }

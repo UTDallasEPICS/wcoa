@@ -40,7 +40,9 @@ async function rawSignup(rideId: string, cookie: string, raceDelayMs?: number): 
 }
 
 async function findCreatedRideId(adminCookie: string): Promise<string> {
-  const rides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie: adminCookie } })
+  const { items: rides } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+    headers: { cookie: adminCookie },
+  })
   const created = rides.find((r) => r.status === 'CREATED' && r.volunteerId === null)
   expect(created, 'seed should contain an available (CREATED) ride').toBeTruthy()
   return created!.id

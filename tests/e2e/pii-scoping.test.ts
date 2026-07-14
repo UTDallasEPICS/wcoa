@@ -19,7 +19,9 @@ type Ride = {
 describe('issue #3 — server-side PII scoping', () => {
   it('ADMIN still receives every ride (full dataset)', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const rides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie } })
+    const { items: rides } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie },
+    })
     expect(Array.isArray(rides)).toBe(true)
     // Seed has 9 rides across all volunteers/clients.
     expect(rides.length).toBeGreaterThanOrEqual(9)
@@ -34,7 +36,9 @@ describe('issue #3 — server-side PII scoping', () => {
     })
     const myUserId = me.user.id
 
-    const rides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie: bobCookie } })
+    const { items: rides } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie: bobCookie },
+    })
 
     // Every returned ride must be either available (CREATED) or assigned to Bob.
     for (const ride of rides) {
@@ -73,8 +77,14 @@ describe('issue #3 — server-side PII scoping', () => {
 
   it('ADMIN can still read the client and volunteer rosters', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const clients = await $fetch<unknown[]>('/api/get/clients', { headers: { cookie } })
-    const volunteers = await $fetch<unknown[]>('/api/get/volunteers', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: unknown[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
+    const { items: volunteers } = await $fetch<{ items: unknown[] }>(
+      '/api/get/volunteers?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(Array.isArray(clients)).toBe(true)
     expect(clients.length).toBeGreaterThanOrEqual(3)
     expect(Array.isArray(volunteers)).toBe(true)

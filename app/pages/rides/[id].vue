@@ -9,7 +9,10 @@
   const { data: session } = await authClient.useSession(useFetch)
   const { data: ride, status, refresh: refreshRide } = await useFetch(`/api/get/rides/byId/${id}`)
   const { data: estimate } = await useFetch(`/api/get/rides/estimate/${id}`)
-  const { data: volunteers } = await useFetch('/api/get/volunteers')
+  // The assignment picker needs the full assignable roster, not a page — the
+  // roster endpoint is paginated now (issue #13), so use the bounded options
+  // endpoint (AVAILABLE volunteers, minimal { id, name } shape).
+  const { data: volunteers } = await useFetch('/api/get/volunteers/options')
 
   const isEditModalOpen = ref(false)
   const isCompleteModalOpen = ref(false)
@@ -69,10 +72,15 @@
       editState.notes = ride.value.notes || ''
       editState.totalRideTime = ride.value.totalRideTime || 0
 
-      // Handle volunteer object binding for USelectMenu
+      // Handle volunteer object binding for USelectMenu. The options endpoint
+      // only lists AVAILABLE volunteers (issue #13), so a currently-assigned
+      // volunteer who is now UNAVAILABLE won't be in it — fall back to the
+      // ride's own volunteer record so the assignee still shows (and isn't
+      // silently dropped on save).
       if (ride.value.volunteerId) {
         const found = volunteers.value?.find((v: any) => v.id === ride.value.volunteerId)
-        editState.volunteerId = found ? { label: found.user.name, value: found.id } : undefined
+        const label = found?.name || ride.value.volunteer?.user?.name || 'Assigned volunteer'
+        editState.volunteerId = { label, value: ride.value.volunteerId }
       } else {
         editState.volunteerId = undefined // or { label: 'Unassigned', value: '' } if preferred
       }
@@ -208,7 +216,7 @@
   const volunteerOptions = computed(() => {
     if (!volunteers.value) return []
     const list = volunteers.value.map((v: any) => ({
-      label: v.user?.name || 'Unknown Volunteer',
+      label: v.name || 'Unknown Volunteer',
       value: v.id,
     }))
     return [{ label: 'Unassigned', value: '' }, ...list]
