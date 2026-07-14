@@ -120,10 +120,12 @@
 
   async function handleComplete(event: any) {
     try {
-      await $fetch(`/api/put/rides/${id}`, {
-        method: 'PUT',
+      // Self-service completion endpoint (issue #87): PUT /api/put/rides/[id] is
+      // blocked for volunteers by the global auth middleware, so the assigned
+      // volunteer (and admins) complete a ride through this dedicated POST.
+      await $fetch(`/api/post/rides/${id}/complete`, {
+        method: 'POST',
         body: {
-          status: 'COMPLETED',
           totalRideTime: event.data.totalRideTime,
         },
       })
