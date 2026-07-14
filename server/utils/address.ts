@@ -13,8 +13,10 @@
  * "Mcdonald Ave".
  *
  * #57 fixes this by splitting the two concerns:
- *   - Display fields: trimmed + internal whitespace collapsed, but casing is
- *     preserved exactly as entered (no Title-Case, no lowercasing).
+ *   - Display fields: trimmed + internal whitespace collapsed, casing preserved
+ *     as entered (no Title-Case, no lowercasing) — EXCEPT `state`, which is
+ *     upper-cased: it's a 2-letter postal code with no acronym-mangling risk,
+ *     and uppercase is the convention (this preserves #16's behavior for state).
  *   - `matchKey`: a lossy, case/whitespace-insensitive derivation of all four
  *     fields, uniqued in the schema so variants still dedup to one row.
  */
@@ -52,7 +54,9 @@ export function normalizeAddress(addr: AddressFields): NormalizedAddress {
   const display: AddressFields = {
     street: collapse(addr.street),
     city: collapse(addr.city),
-    state: collapse(addr.state),
+    // State is a postal code — upper-case it (convention, no acronym risk).
+    // matchKey lowercases anyway, so dedup is unaffected.
+    state: collapse(addr.state).toUpperCase(),
     zip: collapse(addr.zip),
   }
   return {

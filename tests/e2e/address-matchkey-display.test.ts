@@ -26,7 +26,7 @@ function uniqueStreet(): string {
 interface ClientRow {
   id: string
   homeAddressId: string
-  homeAddress: { id: string; street: string }
+  homeAddress: { id: string; street: string; state: string }
 }
 
 async function createClient(cookie: string, street: string, email: string) {
@@ -54,6 +54,20 @@ describe('address matchKey preserves display casing + dedups (#57)', () => {
     // directional mangled to "Nw"). Post-fix the original casing is preserved.
     expect(row.homeAddress.street).toBe(street)
     expect(row.homeAddress.street).not.toContain(' Nw ')
+  })
+
+  it('upper-cases the state for display (postal convention), lower-cased input and all', async () => {
+    const cookie = await adminCookie()
+    const email = `matchkey-state-${Math.floor(Math.random() * 1e9)}@example.com`
+    // Street casing is preserved verbatim; state is a postal code → upper-cased.
+    const created = await $fetch<ClientRow>('/api/post/clients', {
+      method: 'POST',
+      headers: { cookie },
+      body: { name: 'State Case Test', email, street: uniqueStreet(), city: 'Dallas', state: 'tx', zip: '75080' },
+    })
+    const roster = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
+    const row = roster.find((c) => c.id === created.id)!
+    expect(row.homeAddress.state).toBe('TX')
   })
 
   it('still dedups case/whitespace variants onto a single Address row', async () => {
