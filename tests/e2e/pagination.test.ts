@@ -58,6 +58,24 @@ describe('list pagination (#13)', () => {
     expect(res.items.length).toBeLessThanOrEqual(100)
   })
 
+  it('empty pageSize falls back to the default (not 1)', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+    const res = await $fetch<RideEnvelope>('/api/get/rides?pageSize=', { headers: { cookie } })
+    // Number('') === 0 must not clamp to 1 — it falls back to the default (20).
+    expect(res.pageSize).toBe(20)
+  })
+
+  it('clamps an absurd page number instead of 500ing on an unsafe skip', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+    // page*pageSize would exceed Number.MAX_SAFE_INTEGER unless page is capped.
+    const res = await $fetch<RideEnvelope>(
+      '/api/get/rides?page=9007199254740991&pageSize=100',
+      { headers: { cookie } }
+    )
+    expect(res.page).toBe(1_000_000)
+    expect(res.items).toEqual([])
+  })
+
   it('all four list endpoints return the envelope shape', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
     for (const path of [

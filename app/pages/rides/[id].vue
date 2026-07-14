@@ -72,10 +72,15 @@
       editState.notes = ride.value.notes || ''
       editState.totalRideTime = ride.value.totalRideTime || 0
 
-      // Handle volunteer object binding for USelectMenu
+      // Handle volunteer object binding for USelectMenu. The options endpoint
+      // only lists AVAILABLE volunteers (issue #13), so a currently-assigned
+      // volunteer who is now UNAVAILABLE won't be in it — fall back to the
+      // ride's own volunteer record so the assignee still shows (and isn't
+      // silently dropped on save).
       if (ride.value.volunteerId) {
         const found = volunteers.value?.find((v: any) => v.id === ride.value.volunteerId)
-        editState.volunteerId = found ? { label: found.name, value: found.id } : undefined
+        const label = found?.name || ride.value.volunteer?.user?.name || 'Assigned volunteer'
+        editState.volunteerId = { label, value: ride.value.volunteerId }
       } else {
         editState.volunteerId = undefined // or { label: 'Unassigned', value: '' } if preferred
       }
