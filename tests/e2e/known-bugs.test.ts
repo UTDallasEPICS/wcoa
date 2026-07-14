@@ -5,15 +5,19 @@ import { loginAs } from '../utils/auth'
 
 await bootShared()
 
-// Pins for the KNOWN OPEN BUGS found by the 2026-07-14 exhaustive audit
+// Pins for the KNOWN BUGS found by the 2026-07-14 exhaustive audit
 // (issues #87–#97). Each `it.fails` test asserts the *correct* behavior from
-// REQUIREMENTS.md, so today it fails (and `it.fails` turns that into a pass).
+// REQUIREMENTS.md, so while the bug is open it fails (and `it.fails` turns that
+// into a pass).
 //
 // WHEN YOU FIX ONE OF THESE ISSUES: its pin will start "failing" (because the
 // assertions now pass). That is the signal to (1) change `it.fails` → `it`,
 // and (2) keep the test forever as the regression guard for your fix.
 //
-// The one plain `it` at the bottom pins CURRENT behavior for the open
+// Already fixed + flipped to plain `it` (kept here as permanent regression
+// guards): R-135 (#87), R-082/R-083 (#88), R-027 (#93).
+//
+// The plain `it` at the bottom (R-173) pins CURRENT behavior for the open
 // completionRate decision (#96) — flip its assertions when the owner decides.
 
 const ADMIN = 'reachtusharwani@gmail.com'
@@ -43,23 +47,25 @@ async function createRide(cookie: string, clientId: string) {
 }
 
 describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () => {
-  it.fails('R-135 (#87): a volunteer can complete their OWN assigned ride', async () => {
+  it('R-135 (#87): a volunteer can complete their OWN assigned ride', async () => {
     const admin = await loginAs(ADMIN)
     const bob = await loginAs(BOB)
     const client = await createClient(admin, `${RUN} B87`, `${RUN}-87@example.com`)
     const ride = await createRide(admin, client.id)
     await $fetch(`/api/post/rides/${ride.id}/signup`, { method: 'POST', headers: json(bob) })
 
-    // Currently: 403 "Admin access required" from the global middleware.
-    const res = await appFetch(`/api/put/rides/${ride.id}`, {
-      method: 'PUT',
+    // #87 fixed via a dedicated self-service endpoint: the assigned volunteer
+    // completes through POST /api/post/rides/[id]/complete (the UI's "Mark as
+    // Completed" now calls this). PUT /api/put/rides stays admin-only.
+    const res = await appFetch(`/api/post/rides/${ride.id}/complete`, {
+      method: 'POST',
       headers: json(bob),
-      body: JSON.stringify({ status: 'COMPLETED', totalRideTime: 1.5 }),
+      body: JSON.stringify({ totalRideTime: 1.5 }),
     })
     expect(res.status).toBe(200)
   })
 
-  it.fails('R-082 (#88): delete/admins refuses to archive a non-ADMIN user', async () => {
+  it('R-082 (#88): delete/admins refuses to archive a non-ADMIN user', async () => {
     const admin = await loginAs(ADMIN)
     const bob = await loginAs(BOB)
     const bobUser = await $fetch<{ userId: string }>('/api/get/volunteers/bySession', {
@@ -74,7 +80,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(res.status).toBe(404)
   })
 
-  it.fails('R-083 (#88): an admin cannot delete their own account', async () => {
+  it('R-083 (#88): an admin cannot delete their own account', async () => {
     const admin = await loginAs(ADMIN)
     const email = `${RUN}-selfdel@example.com`
     const created = await $fetch<{ id: string }>('/api/post/admins', {
@@ -179,7 +185,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect([400, 409]).toContain(res.status)
   })
 
-  it.fails('R-027 (#93): estimate applies byId record-scoping for volunteers', async () => {
+  it('R-027 (#93): estimate applies byId record-scoping for volunteers', async () => {
     const admin = await loginAs(ADMIN)
     const alice = await loginAs('alice@example.com')
     const bob = await loginAs(BOB)

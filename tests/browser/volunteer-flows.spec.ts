@@ -52,11 +52,10 @@ test('R-299: signup then unsignup on a CREATED ride through the UI', async ({ pa
   expect(released?.volunteerId).toBeNull()
 })
 
-// R-135 pins issue #87 end-to-end: the UI offers "Mark as Completed" but the
-// middleware 403s the PUT. `test.fail` flips when #87 lands — then remove the
-// annotation and this becomes the permanent volunteer-completion regression test.
+// R-135 (#87, landed): the assigned volunteer completes through the UI's "Mark
+// as Completed" flow, which now calls POST /api/post/rides/[id]/complete. This
+// is the permanent volunteer-completion regression test.
 test('R-135 (#87): a volunteer completes their own ride through the UI', async ({ page }) => {
-  test.fail()
   const ride = dbGet<{ id: string }>(
     `SELECT id FROM ride WHERE status = 'CREATED' AND deletedAt IS NULL ORDER BY scheduledTime LIMIT 1`
   )
