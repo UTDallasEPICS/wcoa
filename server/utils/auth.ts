@@ -59,7 +59,16 @@ export const auth = betterAuth({
   plugins: [
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
-        sendEmail(email, 'OTP', `${otp}`)
+        // Surface send failures instead of swallowing them (issue #25): if the
+        // OTP email never sent, the user can't complete sign-in, so report the
+        // failure rather than a false success. `sendEmail` returns false on a
+        // failed send (and logs the error).
+        const sent = await sendEmail(email, 'OTP', `${otp}`)
+        if (!sent) {
+          throw new APIError('INTERNAL_SERVER_ERROR', {
+            message: 'Failed to send verification code. Please try again later.',
+          })
+        }
       },
     }),
   ],
