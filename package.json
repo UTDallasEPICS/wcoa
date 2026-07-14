@@ -11,7 +11,10 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:reset": "prisma migrate reset --force",
     "test": "nuxt prepare && vitest run",
-    "test:watch": "nuxt prepare && vitest"
+    "test:watch": "nuxt prepare && vitest",
+    "test:browser": "playwright test",
+    "test:all": "pnpm test && pnpm test:browser && pnpm trace",
+    "trace": "node scripts/traceability.mjs"
   },
   "dependencies": {
     "@nuxt/ui": "^4.3.0",
@@ -30,6 +33,7 @@
   },
   "devDependencies": {
     "@nuxt/test-utils": "^4.0.3",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.1.18",
     "@types/better-sqlite3": "^7.6.13",
     "prettier": "3.7.4",

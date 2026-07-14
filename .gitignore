@@ -37,3 +37,7 @@ logs
 
 # …but DO commit Prisma migration SQL — it's schema history, not a data dump (issue #33)
 !prisma/migrations/**/*.sql
+
+# playwright artifacts
+test-results/
+playwright-report/
