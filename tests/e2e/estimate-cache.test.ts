@@ -8,12 +8,12 @@ await bootShared()
 
 // Issue #14: GET /api/get/rides/estimate/:id must serve a cached
 // distance/duration from the Ride record instead of hitting the Google Maps
-// Directions API on every load. The test env has no API key, so a cache MISS
-// returns { error: 'Maps API Key not configured', ...nulls }. By populating the
-// cache columns directly in the DB, a cache HIT must instead return the cached
-// values with error: null — which is only possible once the endpoint reads and
-// serves the cache. (Before the fix the endpoint ignores the cache columns and
-// returns the "not configured" miss response, so this test fails.)
+// Directions API on every load. The test env has no server API key, so a cache
+// MISS returns { error: 'Maps API Key not configured', ...nulls }. By populating
+// the cache columns directly in the DB, a cache HIT must instead return the
+// cached values with error: null — which is only possible once the endpoint
+// reads and serves the cache. (Before the fix the endpoint ignores the cache
+// columns and returns the "not configured" miss response, so this test fails.)
 
 function db(): Database.Database {
   const dbPath = (process.env.DATABASE_URL ?? '').replace(/^file:/, '')
@@ -111,8 +111,8 @@ describe('ride estimate caching (issue #14)', () => {
       body: { dropoffDisplay: 'A Completely New Destination, TX' },
     })
 
-    // With the cache cleared and no API key configured, we're back to the miss
-    // response rather than stale cached values.
+    // With the cache cleared and no server API key configured, we're back to the
+    // miss response rather than stale cached values.
     const miss = await $fetch<EstimateResponse>(`/api/get/rides/estimate/${id}`, {
       headers: { cookie },
     })

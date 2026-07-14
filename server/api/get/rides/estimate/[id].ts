@@ -10,7 +10,7 @@ interface EstimateResponse {
 
 export default defineEventHandler(async (event): Promise<EstimateResponse> => {
   const id = getRouterParam(event, 'id')
-  const config = useRuntimeConfig()
+  const config = useRuntimeConfig(event)
 
   if (!id) {
     throw createError({
@@ -54,7 +54,10 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
     }
   }
 
-  const apiKey = config.public.googleMapsApiKey
+  // Issue #30: use the SERVER-ONLY key for the Directions API call. The
+  // powerful Directions-capable key must never ship to the client bundle; only
+  // the map-embed iframe (app/pages/rides/[id].vue) uses the public key.
+  const apiKey = config.googleMapsApiKey
 
   if (!apiKey) {
     return {
