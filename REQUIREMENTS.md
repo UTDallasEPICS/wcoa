@@ -48,7 +48,7 @@ is not documentation that can rot — it is enforced.
 | R-024 | Bulk-PII listings are admin-only: clients(+options), volunteers(+options), users(×3), admins, addresses, metrics(×3), audit, templates (#3, #41) | `requireAdmin` in each handler | auto | `requirements-authz-matrix.test.ts`, `pii-scoping.test.ts` |
 | R-025 | Record-level scoping on `get/rides/byId`: non-admin sees only CREATED rides or rides assigned to them; others 404 (not 403 — no existence leak) (#41) | `get/rides/byId/[id].ts` | auto | `record-scoping.test.ts` |
 | R-026 | `get/rides` list scoping: volunteer receives only CREATED + own rides; fails closed if userId missing (#3) | `get/rides/index.ts` | auto | `pii-scoping.test.ts` |
-| R-027 | `get/rides/estimate/[id]` applies the same record-level scoping as byId | `estimate/[id].ts` | pin [#93](https://github.com/UTDallasEPICS/wcoa/issues/93) | `known-bugs.test.ts` |
+| R-027 | `get/rides/estimate/[id]` applies the same record-level scoping as byId | `estimate/[id].ts` | auto | `known-bugs.test.ts` |
 | R-028 | Frontend route guard: non-admin is redirected away from admin pages (`/`, `/people`, `/admin/**` → `/rides`); unauthenticated → `/auth` (#4) | `app/middleware/auth.global.ts` | auto | `route-guard.test.ts`, browser: `volunteer-flows.spec.ts` |
 | R-029 | `/api/_test/**` seams return 404 unless `TEST_HOOKS=1` (strict prod no-op) | `server/utils/testHooks.ts` | auto | `fault-injection-seam.test.ts` + manual prod-mode boot (audit) |
 | R-030 | Volunteer self-service lookups never trust a session alone — archived volunteer profiles are re-checked (`deletedAt: null`) on signup/unsignup/bySession (#27) | those 5 handlers | auto | `soft-deletes.test.ts` |
@@ -89,8 +89,8 @@ is not documentation that can rot — it is enforced.
 |---|---|---|---|---|
 | R-080 | Admin create requires name+email; promoting an existing user writes a `USER_ROLE_CHANGED` audit row (#28) | `post/admins/index.ts` | auto | `audit-log.test.ts`, `requirements-flows.test.ts` |
 | R-081 | Admin update of an unknown id → 404, not 500 | `put/admins/[id].ts` | pin [#91](https://github.com/UTDallasEPICS/wcoa/issues/91) | `known-bugs.test.ts` |
-| R-082 | `delete/admins` only archives users whose role is ADMIN (404 otherwise) | `delete/admins/[id].ts` | pin [#88](https://github.com/UTDallasEPICS/wcoa/issues/88) | `known-bugs.test.ts` |
-| R-083 | An admin cannot delete their own account, and the last remaining admin cannot be deleted (lockout guard) | `delete/admins/[id].ts` | pin [#88](https://github.com/UTDallasEPICS/wcoa/issues/88) | `known-bugs.test.ts` |
+| R-082 | `delete/admins` only archives users whose role is ADMIN (404 otherwise) | `delete/admins/[id].ts` | auto | `known-bugs.test.ts` |
+| R-083 | An admin cannot delete their own account, and the last remaining admin cannot be deleted (lockout guard) | `delete/admins/[id].ts` | auto | `known-bugs.test.ts` |
 | R-084 | Admin soft-delete releases email/phone, revokes sessions; double-delete 404s | `delete/admins/[id].ts` | auto | `admin-delete.test.ts`, `soft-deletes.test.ts` |
 
 ## 6. Rides — CRUD & lifecycle
@@ -123,7 +123,7 @@ is not documentation that can rot — it is enforced.
 | R-132 | Signup is only possible on a CREATED, non-archived ride (400/404) | `signup.ts` | auto | `requirements-flows.test.ts` |
 | R-133 | Unsignup allowed only for the assigned volunteer (403) and only from ASSIGNED (400); atomic like signup | `unsignup.ts` | auto | `requirements-flows.test.ts` |
 | R-134 | Signup/unsignup notify the volunteer and admins; failures never fail the request | `signup.ts`, `unsignup.ts` | auto | `requirements-flows.test.ts` |
-| R-135 | **A volunteer can complete their OWN assigned ride** (with totalRideTime) through the UI's "Mark as Completed" flow | middleware + `put/rides` | pin [#87](https://github.com/UTDallasEPICS/wcoa/issues/87) | `known-bugs.test.ts`, browser: `volunteer-flows.spec.ts` |
+| R-135 | **A volunteer can complete their OWN assigned ride** (with totalRideTime) through the UI's "Mark as Completed" flow | middleware + `post/rides/[id]/complete` | auto | `known-bugs.test.ts`, browser: `volunteer-flows.spec.ts` |
 
 ## 8. List endpoints — pagination, filtering, search
 
