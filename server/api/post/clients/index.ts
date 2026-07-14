@@ -21,10 +21,14 @@ export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, createClientSchema)
 
   // 1. Upsert User
+  // Normalize the email once (issue #15/#89 semantics) so the lookup and the
+  // stored value agree — otherwise a padded "a@b.com " would miss the untrimmed
+  // lookup yet collide with the trimmed stored value on insert (P2002 -> 500).
+  const email = emptyToNull(body.email)
   let user = null
-  if (body.email) {
+  if (email) {
     user = await prisma.user.findUnique({
-      where: { email: body.email }
+      where: { email }
     })
   }
 
@@ -32,7 +36,7 @@ export default defineEventHandler(async (event) => {
     user = await prisma.user.create({
       data: {
         name: body.name,
-        email: emptyToNull(body.email),
+        email,
         phone: emptyToNull(body.phone),
         role: 'CLIENT'
       }
