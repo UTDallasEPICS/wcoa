@@ -16,6 +16,7 @@ import { auth } from '../utils/auth'
 const VOLUNTEER_WRITE_ALLOW = [
   /^\/api\/post\/rides\/[^/]+\/signup$/,
   /^\/api\/post\/rides\/[^/]+\/unsignup$/,
+  /^\/api\/post\/rides\/[^/]+\/complete$/,
   /^\/api\/put\/volunteers\/bySession(\/|$)/,
 ]
 
