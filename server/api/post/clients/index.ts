@@ -28,7 +28,8 @@ export default defineEventHandler(async (event) => {
   let user = null
   if (email) {
     user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
+      include: { volunteer: true }
     })
   }
 
@@ -42,6 +43,21 @@ export default defineEventHandler(async (event) => {
       }
     })
   } else {
+    // Singular-role guard (issue #92): reject creating a client profile on an
+    // email that already belongs to a volunteer or admin account. Roles are
+    // singular here; without this the user would end up with BOTH a volunteer
+    // and a client profile while role stays VOLUNTEER — a dual profile invisible
+    // to the role model that delete/volunteers would strand. An existing CLIENT
+    // (or a plain user with no profile) is unaffected and falls through to the
+    // "already a client" 400 / normal create below.
+    const hasActiveVolunteer = !!user.volunteer && user.volunteer.deletedAt === null
+    if (user.role === 'VOLUNTEER' || user.role === 'ADMIN' || hasActiveVolunteer) {
+      const accountType = user.role === 'ADMIN' ? 'an admin' : 'a volunteer'
+      throw createError({
+        statusCode: 409,
+        statusMessage: `That email belongs to ${accountType} account`,
+      })
+    }
     // Existing user (matched by email): update name, and phone only when the
     // caller actually sent it (issue #89) — omitting phone here must not wipe the
     // stored number.

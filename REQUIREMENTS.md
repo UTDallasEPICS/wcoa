@@ -65,7 +65,7 @@ is not documentation that can rot — it is enforced.
 | R-045 | A partial update (`{name}` only) must NOT wipe email/phone — omitted fields are no-ops | `put/clients/[id].ts` et al | auto | `known-bugs.test.ts` |
 | R-046 | Update/delete of an unknown or archived client → 404 | `put/clients/[id].ts` | auto | `requirements-flows.test.ts` |
 | R-047 | Setting a client's email to another user's email → clean 4xx conflict, not 500 | `put/clients/[id].ts` | auto | `known-bugs.test.ts` |
-| R-048 | People creates on an email that belongs to a different active profile type are rejected (no dual profiles, no silent role upgrades) | `post/clients`, `post/volunteers` | pin [#92](https://github.com/UTDallasEPICS/wcoa/issues/92) | `known-bugs.test.ts` |
+| R-048 | People creates on an email that belongs to a different active profile type are rejected (no dual profiles, no silent role upgrades) | `post/clients`, `post/volunteers` | auto | `known-bugs.test.ts` |
 | R-049 | Deleting a client with active (non-deleted) rides is blocked with 409 (#23) | `delete/clients/[id].ts` | auto | `safe-delete.test.ts` |
 | R-050 | Client soft-delete archives user+client, releases email/phone to `deletedEmail/deletedPhone` (reusable), revokes sessions, hides from lists, preserves metrics history (#27) | `delete/clients/[id].ts` | auto | `soft-deletes.test.ts` |
 

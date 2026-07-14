@@ -22,6 +22,7 @@ await bootShared()
 
 const ADMIN = 'reachtusharwani@gmail.com'
 const BOB = 'bob@example.com'
+const GEORGE = 'george@example.com'
 const json = (cookie: string) => ({ 'content-type': 'application/json', cookie })
 const RUN = `kb${Date.now().toString(36)}`
 
@@ -171,16 +172,27 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect([400, 409]).toContain(res.status)
   })
 
-  it.fails('R-048 (#92): creating a client with an existing VOLUNTEER email is rejected', async () => {
+  it('R-048 (#92): creating a client with an existing VOLUNTEER email is rejected', async () => {
     const admin = await loginAs(ADMIN)
-    // Currently: 200 — bob becomes a dual volunteer+client profile (and loses
-    // his phone via the #89 wipe on the upsert branch).
+    // Before the fix: 200 — bob became a dual volunteer+client profile (and lost
+    // his phone via the #89 wipe on the upsert branch). Now: 409, roles singular.
     const res = await appFetch('/api/post/clients', {
       method: 'POST', headers: json(admin),
       body: JSON.stringify({
         name: 'Bob Tester', email: BOB,
         street: `${RUN} 3 Pin St`, city: 'Plano', state: 'TX', zip: '75074',
       }),
+    })
+    expect([400, 409]).toContain(res.status)
+  })
+
+  it('R-048 (#92): creating a volunteer with an existing CLIENT email is rejected', async () => {
+    const admin = await loginAs(ADMIN)
+    // Before the fix: 200 — george (a seeded CLIENT) was silently upgraded to
+    // VOLUNTEER while his client profile + rides remained. Now: 409, no upgrade.
+    const res = await appFetch('/api/post/volunteers', {
+      method: 'POST', headers: json(admin),
+      body: JSON.stringify({ name: 'George Tester', email: GEORGE }),
     })
     expect([400, 409]).toContain(res.status)
   })
