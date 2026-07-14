@@ -23,6 +23,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
   const ride = await prisma.ride.findFirst({
     where: { id, deletedAt: null },
     select: {
+      status: true,
       pickupDisplay: true,
       dropoffDisplay: true,
       cachedDistanceText: true,
@@ -30,6 +31,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
       cachedDurationText: true,
       cachedDurationValue: true,
       estimatedAt: true,
+      volunteer: { select: { userId: true } },
     },
   })
 
@@ -38,6 +40,23 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
       statusCode: 404,
       statusMessage: 'Ride not found',
     })
+  }
+
+  // Record-level scoping (issue #93, same class as #41): a non-admin may only
+  // read the estimate of a ride that is available to sign up for (CREATED) or
+  // that is assigned to them — never another volunteer's ride, and never
+  // triggering a billable Directions call on a ride that isn't theirs. Return
+  // 404 (not 403) so we don't reveal that the ride exists, matching
+  // get/rides/byId/[id].ts.
+  const session = getAuth(event)
+  const role = session?.user?.role
+  if (role !== 'ADMIN') {
+    const userId = session?.user?.id
+    const isAvailable = ride.status === 'CREATED'
+    const isMine = !!userId && ride.volunteer?.userId === userId
+    if (!isAvailable && !isMine) {
+      throw createError({ statusCode: 404, statusMessage: 'Ride not found' })
+    }
   }
 
   // Issue #14: serve the cached estimate when present. This avoids a live
