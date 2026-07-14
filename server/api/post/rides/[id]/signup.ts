@@ -110,6 +110,14 @@ export default defineEventHandler(async (event) => {
     throw err
   }
 
+  // Audit (issue #28): the volunteer claimed this ride.
+  await writeAuditLog(event, {
+    action: 'VOLUNTEER_SIGNED_UP',
+    targetType: 'Ride',
+    targetId: id,
+    details: { volunteerId: volunteer.id },
+  })
+
   // 4. Notifications
   const admins = await prisma.user.findMany({
     where: { role: 'ADMIN' }

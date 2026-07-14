@@ -40,6 +40,11 @@
           to: '/admin/notifications',
           icon: 'i-lucide-bell',
         },
+        {
+          label: 'Audit Log',
+          to: '/admin/audit',
+          icon: 'i-lucide-scroll-text',
+        },
       ]
     }
 

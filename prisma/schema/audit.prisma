@@ -1,0 +1,22 @@
+// Audit log (issue #28): an append-only record of who did what, for
+// accountability and troubleshooting on an app that handles client PII,
+// location data, and scheduling.
+//
+// `userId` is stored as a plain string (the acting user's id) rather than a
+// relation on purpose: the actor may later be soft- or hard-deleted, and the
+// audit trail must survive that without a dangling FK. `details` is a small
+// JSON blob describing the change (e.g. { from, to } for a status change) —
+// deliberately minimal, never a full client/PII record.
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  targetType String
+  targetId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+  @@map("audit_log")
+}

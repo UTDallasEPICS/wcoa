@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   // reused by a new record without a unique violation (decision #2). We clear
   // volunteerId on their ASSIGNED rides so the available-rides scoping (which
   // still sees CREATED rides) doesn't leak the archived volunteer's link.
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const volunteer = await tx.volunteer.findFirst({
       where: { id, deletedAt: null },
       select: { userId: true, user: { select: { email: true, phone: true } } },
@@ -60,4 +60,13 @@ export default defineEventHandler(async (event) => {
     await tx.session.deleteMany({ where: { userId: volunteer.userId } })
     return updated
   })
+
+  // Audit (issue #28): record the archival after the transaction commits.
+  await writeAuditLog(event, {
+    action: 'VOLUNTEER_DELETED',
+    targetType: 'Volunteer',
+    targetId: id,
+  })
+
+  return result
 })
