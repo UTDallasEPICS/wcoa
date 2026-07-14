@@ -1,14 +1,24 @@
+import { z } from 'zod'
 import { prisma } from '../../../utils/prisma'
+import { readValidatedBody } from '../../../utils/validation'
+
+// Validate the create payload (issue #90): name + a full address are required,
+// email is optional (a client may have none), and unknown keys are rejected via
+// .strict().
+const createClientSchema = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    street: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    zip: z.string().min(1),
+  })
+  .strict()
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event)
-
-  if (!body.name || !body.street || !body.city || !body.state || !body.zip) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Missing required fields',
-    })
-  }
+  const body = await readValidatedBody(event, createClientSchema)
 
   // 1. Upsert User
   let user = null
@@ -22,17 +32,20 @@ export default defineEventHandler(async (event) => {
     user = await prisma.user.create({
       data: {
         name: body.name,
-        email: body.email || null,
+        email: emptyToNull(body.email),
         phone: emptyToNull(body.phone),
         role: 'CLIENT'
       }
     })
   } else {
+    // Existing user (matched by email): update name, and phone only when the
+    // caller actually sent it (issue #89) — omitting phone here must not wipe the
+    // stored number.
     await prisma.user.update({
       where: { id: user.id },
       data: {
         name: body.name,
-        phone: emptyToNull(body.phone),
+        ...(body.phone !== undefined ? { phone: emptyToNull(body.phone) } : {}),
         // Don't downgrade ADMIN/VOLUNTEER
       }
     })

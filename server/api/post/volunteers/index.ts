@@ -1,15 +1,24 @@
+import { z } from 'zod'
 import { prisma } from '../../../utils/prisma'
 import { sendEmail } from '../../../utils/email'
+import { readValidatedBody } from '../../../utils/validation'
+
+// Validate the create payload (issue #90). status is enum-checked against the
+// VolunteerStatus values (matching put/volunteers/bySession/status), so a bogus
+// status is a 400 instead of being silently stored and dropping the volunteer
+// out of the AVAILABLE broadcast. name/email are required; unknown keys are
+// rejected via .strict().
+const createVolunteerSchema = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().min(1),
+    phone: z.string().nullable().optional(),
+    status: z.enum(['AVAILABLE', 'UNAVAILABLE']).optional(),
+  })
+  .strict()
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event)
-
-  if (!body.name || !body.email) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Name and Email are required',
-    })
-  }
+  const body = await readValidatedBody(event, createVolunteerSchema)
 
   // 1. Upsert User
   // We use upsert to create if not exists, or update name/phone if exists
@@ -28,15 +37,16 @@ export default defineEventHandler(async (event) => {
       }
     })
   } else {
-    // Optionally update user info? Let's just ensure role is VOLUNTEER? 
-    // Or maybe keep as is if they are ADMIN?
-    // For simplicity, let's update name/phone and role if it was CLIENT
+    // Update name and (presence-aware, issue #89) phone; only touch phone when
+    // the caller actually sent it, so promoting an existing user to volunteer
+    // without a phone field doesn't wipe their stored number. Upgrade CLIENT to
+    // VOLUNTEER but never downgrade an ADMIN.
     await prisma.user.update({
       where: { id: user.id },
       data: {
         name: body.name,
-        phone: emptyToNull(body.phone), // Update phone
-        role: user.role === 'CLIENT' ? 'VOLUNTEER' : user.role // Upgrade CLIENT to VOLUNTEER
+        ...(body.phone !== undefined ? { phone: emptyToNull(body.phone) } : {}),
+        role: user.role === 'CLIENT' ? 'VOLUNTEER' : user.role
       }
     })
   }
