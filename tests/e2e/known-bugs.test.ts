@@ -97,7 +97,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     if (!res.ok) await appFetch(`/api/delete/admins/${created.id}`, { method: 'DELETE', headers: json(admin) })
   })
 
-  it.fails('R-045 (#89): a partial client update does not wipe email/phone', async () => {
+  it('R-045 (#89): a partial client update does not wipe email/phone', async () => {
     const admin = await loginAs(ADMIN)
     const email = `${RUN}-89@example.com`
     const client = await createClient(admin, `${RUN} B89`, email, '5559990089')
@@ -113,7 +113,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(user.phone).toBe('5559990089')
   })
 
-  it.fails('R-063 (#90): admin volunteer update rejects a bogus status enum', async () => {
+  it('R-063 (#90): admin volunteer update rejects a bogus status enum', async () => {
     const admin = await loginAs(ADMIN)
     const created = await $fetch<{ id: string }>('/api/post/volunteers', {
       method: 'POST', headers: json(admin),
@@ -127,7 +127,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(res.status).toBe(400)
   })
 
-  it.fails('R-104 (#90): ride create rejects malformed input with 400, never 500', async () => {
+  it('R-104 (#90): ride create rejects malformed input with 400, never 500', async () => {
     const admin = await loginAs(ADMIN)
     // Currently: 500 (raw FK error surfaces).
     const badClient = await appFetch('/api/post/rides', {
@@ -142,7 +142,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(badClient.status).toBe(400)
   })
 
-  it.fails('R-081 (#91): admin update of an unknown id returns 404, not 500', async () => {
+  it('R-081 (#91): admin update of an unknown id returns 404, not 500', async () => {
     const admin = await loginAs(ADMIN)
     const res = await appFetch('/api/put/admins/nonexistent-id', {
       method: 'PUT', headers: json(admin), body: JSON.stringify({ name: 'X' }),
@@ -150,7 +150,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(res.status).toBe(404)
   })
 
-  it.fails('R-190 (#91): updating an UNKNOWN template name with a valid body returns 404, not 500', async () => {
+  it('R-190 (#91): updating an UNKNOWN template name with a valid body returns 404, not 500', async () => {
     // Found BY this framework (2026-07-14): the audit's hand probe used an empty
     // body, which 400s on validation before reaching the unhandled P2025.
     const admin = await loginAs(ADMIN)
@@ -160,7 +160,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect([400, 404]).toContain(res.status)
   })
 
-  it.fails('R-047 (#91): duplicate email on a client update returns a clean 4xx, not 500', async () => {
+  it('R-047 (#91): duplicate email on a client update returns a clean 4xx, not 500', async () => {
     const admin = await loginAs(ADMIN)
     const a = await createClient(admin, `${RUN} B91a`, `${RUN}-91a@example.com`)
     await createClient(admin, `${RUN} B91b`, `${RUN}-91b@example.com`)

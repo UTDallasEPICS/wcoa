@@ -1,14 +1,19 @@
+import { z } from 'zod'
 import { prisma } from '../../../utils/prisma'
+import { readValidatedBody } from '../../../utils/validation'
+
+// Validate the create payload (issue #90): name + email are required, phone is
+// optional, and unknown keys are rejected via .strict().
+const createAdminSchema = z
+  .object({
+    name: z.string().min(1),
+    email: z.string().min(1),
+    phone: z.string().nullable().optional(),
+  })
+  .strict()
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event)
-
-  if (!body.name || !body.email) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Name and Email are required',
-    })
-  }
+  const body = await readValidatedBody(event, createAdminSchema)
 
   // Check if user exists
   const existingUser = await prisma.user.findUnique({
@@ -16,13 +21,14 @@ export default defineEventHandler(async (event) => {
   })
 
   if (existingUser) {
-    // If user exists, update role to ADMIN
+    // If user exists, promote to ADMIN. Update phone only when the caller sent
+    // it (issue #89) so promoting a user without a phone field doesn't wipe it.
     const updated = await prisma.user.update({
       where: { id: existingUser.id },
       data: {
         role: 'ADMIN',
         name: body.name,
-        phone: emptyToNull(body.phone),
+        ...(body.phone !== undefined ? { phone: emptyToNull(body.phone) } : {}),
       },
     })
     // Audit (issue #28): a user was promoted to ADMIN — a privileged change.

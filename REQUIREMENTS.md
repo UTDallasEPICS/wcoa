@@ -62,9 +62,9 @@ is not documentation that can rot — it is enforced.
 | R-042 | Creating a second client profile for the same user → 400 "already a client" | `post/clients/index.ts` | auto | `requirements-flows.test.ts` |
 | R-043 | Blank/whitespace phone is stored as NULL so multiple blank-phone records don't trip the unique constraint (#15, #53) | `server/utils/sanitize.ts` | auto | `empty-phone.test.ts`, `admin-empty-phone.test.ts` |
 | R-044 | Client home address is deduped onto the `matchKey` unique (case/whitespace variants collapse; display casing preserved, state uppercased) (#16, #57) | `server/utils/address.ts` | auto | `address-normalization.test.ts`, `address-matchkey-display.test.ts` |
-| R-045 | A partial update (`{name}` only) must NOT wipe email/phone — omitted fields are no-ops | `put/clients/[id].ts` et al | pin [#89](https://github.com/UTDallasEPICS/wcoa/issues/89) | `known-bugs.test.ts` |
+| R-045 | A partial update (`{name}` only) must NOT wipe email/phone — omitted fields are no-ops | `put/clients/[id].ts` et al | auto | `known-bugs.test.ts` |
 | R-046 | Update/delete of an unknown or archived client → 404 | `put/clients/[id].ts` | auto | `requirements-flows.test.ts` |
-| R-047 | Setting a client's email to another user's email → clean 4xx conflict, not 500 | `put/clients/[id].ts` | pin [#91](https://github.com/UTDallasEPICS/wcoa/issues/91) | `known-bugs.test.ts` |
+| R-047 | Setting a client's email to another user's email → clean 4xx conflict, not 500 | `put/clients/[id].ts` | auto | `known-bugs.test.ts` |
 | R-048 | People creates on an email that belongs to a different active profile type are rejected (no dual profiles, no silent role upgrades) | `post/clients`, `post/volunteers` | pin [#92](https://github.com/UTDallasEPICS/wcoa/issues/92) | `known-bugs.test.ts` |
 | R-049 | Deleting a client with active (non-deleted) rides is blocked with 409 (#23) | `delete/clients/[id].ts` | auto | `safe-delete.test.ts` |
 | R-050 | Client soft-delete archives user+client, releases email/phone to `deletedEmail/deletedPhone` (reusable), revokes sessions, hides from lists, preserves metrics history (#27) | `delete/clients/[id].ts` | auto | `soft-deletes.test.ts` |
@@ -76,7 +76,7 @@ is not documentation that can rot — it is enforced.
 | R-060 | Volunteer create requires name + email (400 otherwise) | `post/volunteers/index.ts` | auto | `requirements-flows.test.ts` |
 | R-061 | Duplicate volunteer profile → 400 "already a volunteer" | `post/volunteers/index.ts` | auto | `requirements-flows.test.ts` |
 | R-062 | Welcome email on volunteer create is fire-and-forget (a send failure never fails the request) | `post/volunteers/index.ts` | auto | `requirements-flows.test.ts` |
-| R-063 | `status` on volunteer create/update is validated against the VolunteerStatus enum (400 on bogus values) — admin endpoints, matching the already-validated bySession endpoint | `post/volunteers`, `put/volunteers/[id]` | pin [#90](https://github.com/UTDallasEPICS/wcoa/issues/90) | `known-bugs.test.ts` |
+| R-063 | `status` on volunteer create/update is validated against the VolunteerStatus enum (400 on bogus values) — admin endpoints, matching the already-validated bySession endpoint | `post/volunteers`, `put/volunteers/[id]` | auto | `known-bugs.test.ts` |
 | R-064 | Volunteer soft-delete: ASSIGNED rides return to the pool (`CREATED`, volunteerId NULL), user archived, email/phone released, sessions revoked, hidden from lists (#7, #23, #27) | `delete/volunteers/[id].ts` | auto | `safe-delete.test.ts`, `soft-deletes.test.ts` |
 | R-065 | `put/volunteers/bySession/status` accepts only valid enum values (400 otherwise) and updates only the session volunteer | bySession/status.ts | auto | `requirements-flows.test.ts` |
 | R-066 | `put/volunteers/bySession/reminders` replaces the reminder set atomically; zod-validated (`minutesBefore` positive int) | bySession/reminders.ts | auto | `requirements-flows.test.ts` |
@@ -88,7 +88,7 @@ is not documentation that can rot — it is enforced.
 | ID | Requirement | Source | Status | Coverage |
 |---|---|---|---|---|
 | R-080 | Admin create requires name+email; promoting an existing user writes a `USER_ROLE_CHANGED` audit row (#28) | `post/admins/index.ts` | auto | `audit-log.test.ts`, `requirements-flows.test.ts` |
-| R-081 | Admin update of an unknown id → 404, not 500 | `put/admins/[id].ts` | pin [#91](https://github.com/UTDallasEPICS/wcoa/issues/91) | `known-bugs.test.ts` |
+| R-081 | Admin update of an unknown id → 404, not 500 | `put/admins/[id].ts` | auto | `known-bugs.test.ts` |
 | R-082 | `delete/admins` only archives users whose role is ADMIN (404 otherwise) | `delete/admins/[id].ts` | auto | `known-bugs.test.ts` |
 | R-083 | An admin cannot delete their own account, and the last remaining admin cannot be deleted (lockout guard) | `delete/admins/[id].ts` | auto | `known-bugs.test.ts` |
 | R-084 | Admin soft-delete releases email/phone, revokes sessions; double-delete 404s | `delete/admins/[id].ts` | auto | `admin-delete.test.ts`, `soft-deletes.test.ts` |
@@ -101,7 +101,7 @@ is not documentation that can rot — it is enforced.
 | R-101 | Ride create resolves both addresses through the matchKey upsert (no duplicate Address rows) | `post/rides/index.ts` | auto | `address-normalization.test.ts` |
 | R-102 | Ride create with volunteerId starts ASSIGNED; without starts CREATED | `post/rides/index.ts` | auto | `requirements-flows.test.ts` |
 | R-103 | The RIDE_CREATED broadcast is fire-and-forget: a slow/failing broadcast neither delays nor fails ride creation (#32) | `post/rides/index.ts` | auto | `ride-broadcast-nonblocking.test.ts` |
-| R-104 | Ride create validates input shape (bad clientId / non-object addresses / invalid date → 400, never 500) | `post/rides/index.ts` | pin [#90](https://github.com/UTDallasEPICS/wcoa/issues/90) | `known-bugs.test.ts` |
+| R-104 | Ride create validates input shape (bad clientId / non-object addresses / invalid date → 400, never 500) | `post/rides/index.ts` | auto | `known-bugs.test.ts` |
 | R-105 | Ride update accepts ONLY whitelisted fields; unknown keys 400 via `.strict()` (mass-assignment guard, #31) | `put/rides/[id].ts` | auto | `ride-input-validation.test.ts` |
 | R-106 | Unassigning a volunteer (volunteerId → null/"") auto-resets status to CREATED — but only when the ride was ASSIGNED and no explicit status was sent (#7) | `put/rides/[id].ts` | auto | `unassign-status.test.ts` |
 | R-107 | Completing a ride requires totalRideTime ≥ 0.1 (on the request or already stored) (#10) | `put/rides/[id].ts` | auto | `complete-requires-ridetime.test.ts` |
