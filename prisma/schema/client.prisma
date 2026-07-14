@@ -22,12 +22,19 @@ model Address {
   state  String
   zip    String
 
+  // Dedup key (issue #57). Derived from the address fields lowercased +
+  // whitespace-collapsed so case/whitespace variants collapse to one row,
+  // WITHOUT mangling the original-cased street/city/state/zip that back
+  // Client.homeAddress on the people page (Title-Casing broke "123 NW 5th
+  // Ave" → "123 Nw 5th Ave", "PO Box 12" → "Po Box 12", etc). The display
+  // fields are stored as the user typed them (trim + collapse only).
+  matchKey String @unique
+
   clients Client[]
 
   // Relations to track historical rides (optional)
   ridesStarted Ride[] @relation("PickupRef")
   ridesEnded   Ride[] @relation("DropoffRef")
 
-  @@unique([street, city, state, zip])
   @@map("address")
 }
