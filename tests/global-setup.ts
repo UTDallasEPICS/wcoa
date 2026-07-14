@@ -77,13 +77,14 @@ export default async function globalSetup() {
       // strict no-ops without this flag, which only the harness ever sets.
       TEST_HOOKS: '1',
       DISABLE_RATE_LIMIT: 'true',
-      // Issue #30: set ONLY the server-only Directions key; leave the public
-      // embed key (NUXT_PUBLIC_GOOGLE_MAPS_API_KEY) unset. This lets the
-      // maps-key-split regression test assert that the estimate endpoint reads
-      // the private key (config.googleMapsApiKey), not the empty public one.
-      // The value is a bogus placeholder — Google rejects it, so no real quota
-      // is used; the endpoint still gets PAST the "not configured" gate.
-      NUXT_GOOGLE_MAPS_API_KEY: 'test-server-directions-key-not-real',
+      // Issue #30: set ONLY the PUBLIC embed key and leave the server-only
+      // Directions key (NUXT_GOOGLE_MAPS_API_KEY) UNSET. This keeps the suite
+      // hermetic: post-fix the estimate endpoint reads the empty *server* key,
+      // short-circuits at the "not configured" gate, and makes NO outbound call.
+      // The bogus public value lets the maps-key-split regression test prove the
+      // endpoint no longer reads config.public (pre-fix it would read this set
+      // public key, get past the gate, and attempt a live call).
+      NUXT_PUBLIC_GOOGLE_MAPS_API_KEY: 'test-public-embed-key-not-real',
     },
     stdio: 'inherit',
   })

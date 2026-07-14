@@ -11,16 +11,17 @@ await bootShared()
 // (runtimeConfig.googleMapsApiKey / NUXT_GOOGLE_MAPS_API_KEY), not the public
 // embed key (runtimeConfig.public.googleMapsApiKey).
 //
-// The harness (tests/global-setup.ts) sets ONLY the server-only key
-// (NUXT_GOOGLE_MAPS_API_KEY) and leaves the public key unset. So:
-//   - AFTER the fix: the endpoint reads the (bogus-but-present) server key,
-//     gets PAST the "not configured" gate, and attempts the live Directions
-//     call — returning some OTHER error (REQUEST_DENIED / 'Failed to fetch
-//     estimate' if egress is blocked), never 'Maps API Key not configured'.
+// The harness (tests/global-setup.ts) sets ONLY the PUBLIC embed key
+// (NUXT_PUBLIC_GOOGLE_MAPS_API_KEY, a bogus value) and leaves the server key
+// UNSET. So:
+//   - AFTER the fix: the endpoint reads the EMPTY server key, short-circuits at
+//     the "not configured" gate, and makes NO outbound call — it returns
+//     { error: 'Maps API Key not configured', ...nulls }.
 //   - BEFORE the fix: the endpoint reads config.public.googleMapsApiKey, which
-//     is EMPTY, so it returns { error: 'Maps API Key not configured', ...nulls }.
-// This assertion therefore FAILS pre-fix and PASSES post-fix, and is robust to
-// whether the test environment has outbound network to Google.
+//     is the bogus-but-SET public value, gets PAST the gate, and attempts a
+//     live Directions call — so error is NOT 'Maps API Key not configured'.
+// This assertion therefore FAILS pre-fix and PASSES post-fix, and the green
+// (post-fix) suite makes ZERO outbound calls — it stays fully hermetic.
 
 function firstRideId(): string {
   const dbPath = (process.env.DATABASE_URL ?? '').replace(/^file:/, '')
@@ -63,7 +64,7 @@ afterEach(() => {
 })
 
 describe('maps key split (issue #30)', () => {
-  it('estimate endpoint uses the SERVER-only key, not the empty public key', async () => {
+  it('estimate endpoint reads the empty SERVER key, not the set public key', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
     const id = firstRideId()
     // Ensure a cache MISS so the endpoint reaches the key-gated branch.
@@ -74,8 +75,8 @@ describe('maps key split (issue #30)', () => {
       headers: { cookie },
     })
 
-    // Pre-fix (reads the empty public key) this is 'Maps API Key not configured'.
-    // Post-fix (reads the set server key) it is anything but that.
-    expect(res.error).not.toBe('Maps API Key not configured')
+    // Post-fix: server key is empty → short-circuits at the gate, no network.
+    // Pre-fix: reads the SET public key → gets past the gate → NOT this string.
+    expect(res.error).toBe('Maps API Key not configured')
   })
 })
