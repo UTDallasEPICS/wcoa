@@ -45,3 +45,12 @@ export function maybeFault(label: string, event?: H3Event): void {
     throw createError({ statusCode: 500, statusMessage: `injected test fault: ${label}` })
   }
 }
+
+// Non-throwing variant of the context-free (armed) fault check. Lets code that
+// reports failure via a return value — rather than by throwing — observe an
+// armed fault (e.g. sendEmail returning `false` on the 'email-send' fault, #25).
+// Strict no-op in production: always `false` unless TEST_HOOKS=1.
+export function isFaultArmed(label: string): boolean {
+  if (process.env.TEST_HOOKS !== '1') return false
+  return armedFaults.has(label)
+}
