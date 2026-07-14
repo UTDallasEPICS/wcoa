@@ -30,7 +30,10 @@ describe('issue #41 — single-record & admin-only endpoint scoping', () => {
 
       // Admin sees every ride; find one that is NOT available (CREATED) and NOT
       // Bob's — i.e. a ride assigned to (or completed by) another volunteer.
-      const allRides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie: adminCookie } })
+      const { items: allRides } = await $fetch<{ items: Ride[] }>(
+        '/api/get/rides?pageSize=100',
+        { headers: { cookie: adminCookie } }
+      )
       const foreign = allRides.find(
         (r) => r.status !== 'CREATED' && r.volunteer && r.volunteer.userId !== myUserId
       )
@@ -45,7 +48,10 @@ describe('issue #41 — single-record & admin-only endpoint scoping', () => {
       const adminCookie = await loginAs('reachtusharwani@gmail.com')
       const bobCookie = await loginAs('bob@example.com')
 
-      const allRides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie: adminCookie } })
+      const { items: allRides } = await $fetch<{ items: Ride[] }>(
+        '/api/get/rides?pageSize=100',
+        { headers: { cookie: adminCookie } }
+      )
       const available = allRides.find((r) => r.status === 'CREATED')
       expect(available, 'seed should contain an available ride').toBeTruthy()
 
@@ -63,7 +69,10 @@ describe('issue #41 — single-record & admin-only endpoint scoping', () => {
       })
       const myUserId = me.user.id
 
-      const allRides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie: adminCookie } })
+      const { items: allRides } = await $fetch<{ items: Ride[] }>(
+        '/api/get/rides?pageSize=100',
+        { headers: { cookie: adminCookie } }
+      )
       const mine = allRides.find((r) => r.volunteer && r.volunteer.userId === myUserId)
       expect(mine, 'seed should contain a ride assigned to Bob').toBeTruthy()
 
@@ -75,7 +84,10 @@ describe('issue #41 — single-record & admin-only endpoint scoping', () => {
 
     it('ADMIN can fetch any ride by id', async () => {
       const adminCookie = await loginAs('reachtusharwani@gmail.com')
-      const allRides = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie: adminCookie } })
+      const { items: allRides } = await $fetch<{ items: Ride[] }>(
+        '/api/get/rides?pageSize=100',
+        { headers: { cookie: adminCookie } }
+      )
       const anyAssigned = allRides.find((r) => r.status !== 'CREATED' && r.volunteer)
       expect(anyAssigned).toBeTruthy()
       const ride = await $fetch<Ride>(`/api/get/rides/byId/${anyAssigned!.id}`, {
@@ -113,7 +125,7 @@ describe('issue #41 — single-record & admin-only endpoint scoping', () => {
     it('VOLUNTEER gets 403 on get/users/byId/[id]', async () => {
       const adminCookie = await loginAs('reachtusharwani@gmail.com')
       const bobCookie = await loginAs('bob@example.com')
-      const admins = await $fetch<{ id: string }[]>('/api/get/admins', {
+      const { items: admins } = await $fetch<{ items: { id: string }[] }>('/api/get/admins', {
         headers: { cookie: adminCookie },
       })
       const someUserId = admins[0]!.id
@@ -124,9 +136,10 @@ describe('issue #41 — single-record & admin-only endpoint scoping', () => {
 
     it('ADMIN can read get/users/byId/[id]', async () => {
       const adminCookie = await loginAs('reachtusharwani@gmail.com')
-      const admins = await $fetch<{ id: string; email: string }[]>('/api/get/admins', {
-        headers: { cookie: adminCookie },
-      })
+      const { items: admins } = await $fetch<{ items: { id: string; email: string }[] }>(
+        '/api/get/admins',
+        { headers: { cookie: adminCookie } }
+      )
       const target = admins[0]!
       const byId = await $fetch<{ id: string }>(`/api/get/users/byId/${target.id}`, {
         headers: { cookie: adminCookie },

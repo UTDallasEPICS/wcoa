@@ -64,9 +64,10 @@ describe('soft deletes (#27)', () => {
     expect(res.status, 'soft delete should succeed').toBe(200)
 
     // Gone from the active roster.
-    const clientsAfter = await $fetch<ClientRow[]>('/api/get/clients', {
-      headers: { cookie },
-    })
+    const { items: clientsAfter } = await $fetch<{ items: ClientRow[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(clientsAfter.some((c) => c.id === client.id)).toBe(false)
 
     // But the underlying rows still exist with deletedAt set (direct DB read),
@@ -111,7 +112,7 @@ describe('soft deletes (#27)', () => {
     expect(second.id).not.toBe(first.id)
 
     // The re-added client is live in the roster.
-    const clients = await $fetch<ClientRow[]>('/api/get/clients', {
+    const { items: clients } = await $fetch<{ items: ClientRow[] }>('/api/get/clients?pageSize=100', {
       headers: { cookie },
     })
     const live = clients.find((c) => c.user.email === email)
@@ -180,7 +181,7 @@ describe('soft deletes (#27)', () => {
     )
 
     // Create a completed ride worth a known number of hours.
-    const clients = await $fetch<ClientRow[]>('/api/get/clients', {
+    const { items: clients } = await $fetch<{ items: ClientRow[] }>('/api/get/clients?pageSize=100', {
       headers: { cookie },
     })
     const someClient = clients[0]
@@ -218,9 +219,10 @@ describe('soft deletes (#27)', () => {
     expect(del.status).toBe(200)
 
     // It no longer shows in the active rides list...
-    const rides = await $fetch<Array<{ id: string }>>('/api/get/rides', {
-      headers: { cookie },
-    })
+    const { items: rides } = await $fetch<{ items: Array<{ id: string }> }>(
+      '/api/get/rides?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(rides.some((r) => r.id === ride.id)).toBe(false)
 
     // ...but the metrics still count it (historical preservation).

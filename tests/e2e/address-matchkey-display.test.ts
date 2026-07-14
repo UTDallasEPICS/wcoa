@@ -46,7 +46,9 @@ describe('address matchKey preserves display casing + dedups (#57)', () => {
     const created = await createClient(cookie, street, email)
 
     // Read back via the admin people/clients roster endpoint.
-    const roster = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
+    const { items: roster } = await $fetch<{ items: ClientRow[] }>('/api/get/clients?pageSize=100', {
+      headers: { cookie },
+    })
     const row = roster.find((c) => c.id === created.id)!
     expect(row).toBeTruthy()
 
@@ -65,7 +67,9 @@ describe('address matchKey preserves display casing + dedups (#57)', () => {
       headers: { cookie },
       body: { name: 'State Case Test', email, street: uniqueStreet(), city: 'Dallas', state: 'tx', zip: '75080' },
     })
-    const roster = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
+    const { items: roster } = await $fetch<{ items: ClientRow[] }>('/api/get/clients?pageSize=100', {
+      headers: { cookie },
+    })
     const row = roster.find((c) => c.id === created.id)!
     expect(row.homeAddress.state).toBe('TX')
   })

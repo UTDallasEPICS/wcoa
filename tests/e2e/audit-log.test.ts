@@ -39,7 +39,11 @@ function userIdByEmail(email: string): string {
 }
 
 async function getRides(cookie: string): Promise<Ride[]> {
-  return await $fetch<Ride[]>('/api/get/rides', { headers: { cookie } })
+  // /api/get/rides is paginated (issue #13); pageSize=100 fetches the full set.
+  const res = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+    headers: { cookie },
+  })
+  return res.items
 }
 
 // Rides cancelled here are restored to CREATED afterwards so the shared seed DB

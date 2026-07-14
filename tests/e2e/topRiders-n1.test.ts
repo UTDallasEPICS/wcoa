@@ -73,7 +73,9 @@ describe('topRiders N+1 (issue #24)', () => {
 
   it('returns real client names + correct counts, ordered desc (batching unchanged)', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const clients = await $fetch<Client[]>('/api/get/clients', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: Client[] }>('/api/get/clients?pageSize=100', {
+      headers: { cookie },
+    })
     const [clientA, clientB] = clients
     expect(clientA, 'seed should provide at least two clients').toBeTruthy()
     expect(clientB, 'seed should provide at least two clients').toBeTruthy()

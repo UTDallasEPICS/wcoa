@@ -52,7 +52,9 @@ async function createCompletedRide(
 describe('metrics date range — end day is inclusive (issue #18)', () => {
   it('counts an afternoon ride scheduled on the endDate day', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const clients = await $fetch<Client[]>('/api/get/clients', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: Client[] }>('/api/get/clients?pageSize=100', {
+      headers: { cookie },
+    })
     const clientId = clients[0]!.id
 
     // A fixed day well away from seeded times so nothing else lands here.
@@ -90,7 +92,9 @@ describe('metrics date range — end day is inclusive (issue #18)', () => {
 
   it('includes the endDate day for topRiders (explicit-endDate path, lt bug)', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const clients = await $fetch<Client[]>('/api/get/clients', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: Client[] }>('/api/get/clients?pageSize=100', {
+      headers: { cookie },
+    })
     // Use a distinct client so its completed-ride count is unambiguous.
     const client = clients[1] ?? clients[0]!
 

@@ -14,8 +14,11 @@
   const { data: session } = await authClient.useSession(useFetch)
   const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
 
-  const { data: clients } = await useFetch('/api/get/clients')
-  const { data: volunteers } = await useFetch('/api/get/volunteers')
+  // Dropdowns need the full (bounded) roster, not a page — the list endpoints
+  // are now paginated (issue #13), so the pickers use dedicated options
+  // endpoints that return a minimal { id, name(, homeAddress) } shape.
+  const { data: clients } = await useFetch('/api/get/clients/options')
+  const { data: volunteers } = await useFetch('/api/get/volunteers/options')
 
   const search = ref('')
   const savedSort = useCookie<string>('ride-sort', { default: () => 'desc' })
@@ -24,6 +27,21 @@
   watch(sort, (newVal) => {
     savedSort.value = newVal
   })
+
+  // --- Server-side pagination (issue #13) ---
+  // The rides list used to load the entire table and filter it client-side.
+  // Filtering, sorting and pagination now all happen on the server, so the
+  // table binds directly to the returned page. Debounce search so typing
+  // doesn't fire a request per keystroke.
+  const PAGE_SIZE = 20
+  const page = ref(1)
+  const debouncedSearch = ref('')
+  const applyDebouncedSearch = debounce((value: string) => {
+    debouncedSearch.value = value
+  }, 300)
+  watch(search, (value) => applyDebouncedSearch(value))
+  const startDate = ref('')
+  const endDate = ref('')
 
   // Persisted State
   const savedActiveFilters = useCookie<{ label: string; value: string }[]>('ride-active-filters', {
@@ -49,13 +67,42 @@
     sanitizeSavedFilters(savedExcludedFilters.value, knownFilterValues)
   )
 
-  // Use watch to refetch when sort changes
+  // Include/exclude filter chips are sent to the backend as comma-separated
+  // values (e.g. "status:CREATED,assign:ME"); the server applies them so they
+  // compose with pagination instead of only filtering the current page (#13).
+  const includeParam = computed(() =>
+    activeFilters.value.map((f) => f.value).join(',')
+  )
+  const excludeParam = computed(() =>
+    excludedFilters.value.map((f) => f.value).join(',')
+  )
+
+  // useFetch watches these reactive query refs and refetches automatically, so
+  // changing page / sort / search / filters re-queries the server for that page.
   const {
-    data: rides,
+    data: ridesData,
     status,
     refresh: refreshRides,
   } = await useFetch('/api/get/rides', {
-    query: { sort },
+    query: {
+      sort,
+      page,
+      pageSize: PAGE_SIZE,
+      search: computed(() => debouncedSearch.value || undefined),
+      startDate: computed(() => startDate.value || undefined),
+      endDate: computed(() => endDate.value || undefined),
+      include: computed(() => includeParam.value || undefined),
+      exclude: computed(() => excludeParam.value || undefined),
+    },
+  })
+
+  const rides = computed(() => ridesData.value?.items ?? [])
+  const total = computed(() => ridesData.value?.total ?? 0)
+
+  // Any filter/search/sort change should return to the first page so results
+  // aren't hidden on a page that no longer exists.
+  watch([debouncedSearch, startDate, endDate, includeParam, excludeParam, sort], () => {
+    page.value = 1
   })
 
   // Sync state back to cookies
@@ -74,8 +121,6 @@
     { deep: true }
   )
 
-  const startDate = ref('')
-  const endDate = ref('')
   const isCreateModalOpen = ref(false)
 
   const filterOptions = computed(() => {
@@ -168,7 +213,7 @@
   const volunteerOptions = computed(() => {
     if (!volunteers.value) return []
     const list = volunteers.value.map((v: any) => ({
-      label: v.user?.name || 'Unknown Volunteer',
+      label: v.name || 'Unknown Volunteer',
       value: v.id,
     }))
     return [{ label: 'Unassigned', value: '' }, ...list]
@@ -210,82 +255,9 @@
     dropoffSearch.value = ''
   }
 
-  const filteredRides = computed(() => {
-    if (!rides.value) return []
-
-    let result = rides.value
-
-    // Consolidated Filter Logic (OR Condition for Inclusion)
-    if (activeFilters.value.length > 0) {
-      result = result.filter((ride: any) => {
-        return activeFilters.value.some((filter) => {
-          const val = filter.value
-
-          if (val.startsWith('status:')) {
-            const status = val.replace('status:', '')
-            return ride.status === status
-          }
-
-          if (val === 'assign:ME') {
-            const myId = session.value?.user?.id
-            return !!(myId && ride.volunteer?.userId === myId)
-          }
-
-          return false
-        })
-      })
-    }
-
-    // Exclusion Filter Logic (AND NOT Condition)
-    if (excludedFilters.value.length > 0) {
-      result = result.filter((ride: any) => {
-        // Must NOT match ANY of the excluded filters
-        return !excludedFilters.value.some((filter) => {
-          const val = filter.value
-
-          if (val.startsWith('status:')) {
-            const status = val.replace('status:', '')
-            return ride.status === status
-          }
-
-          if (val === 'assign:ME') {
-            const myId = session.value?.user?.id
-            return !!(myId && ride.volunteer?.userId === myId)
-          }
-
-          return false
-        })
-      })
-    }
-
-    // Date Range Filter
-    if (startDate.value) {
-      result = result.filter(
-        (ride: any) => new Date(ride.scheduledTime) >= new Date(startDate.value)
-      )
-    }
-    if (endDate.value) {
-      const end = new Date(endDate.value)
-      end.setDate(end.getDate() + 1)
-      result = result.filter((ride: any) => new Date(ride.scheduledTime) < end)
-    }
-
-    // Search Filter
-    if (search.value) {
-      const q = search.value.toLowerCase()
-      result = result.filter((ride: any) => {
-        return (
-          ride.id.toLowerCase().includes(q) ||
-          ride.client?.user?.name?.toLowerCase().includes(q) ||
-          ride.volunteer?.user?.name?.toLowerCase().includes(q) ||
-          ride.pickupDisplay?.toLowerCase().includes(q) ||
-          ride.dropoffDisplay?.toLowerCase().includes(q)
-        )
-      })
-    }
-
-    return result
-  })
+  // Filtering, searching, date-range and sorting are all applied server-side
+  // (issue #13) so they compose with pagination. The table binds directly to
+  // the returned page (`rides`) — no client-side filtering pass.
 
   const columns: TableColumn<any>[] = [
     {
@@ -444,12 +416,20 @@
     </div>
 
     <UTable
-      :data="filteredRides"
+      :data="rides"
       :columns="columns"
       :loading="status === 'pending'"
       class="w-full cursor-pointer"
       @select="onSelect"
     />
+
+    <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
+      <UPagination
+        v-model:page="page"
+        :total="total"
+        :items-per-page="PAGE_SIZE"
+      />
+    </div>
 
     <!-- Create Ride Modal -->
     <UModal v-model:open="isCreateModalOpen" title="Create New Ride">
@@ -459,7 +439,7 @@
             <UFormField label="Client" name="clientId">
               <USelect
                 v-model="state.clientId"
-                :items="clients?.map((c) => ({ label: c.user.name, value: c.id })) || []"
+                :items="clients?.map((c) => ({ label: c.name, value: c.id })) || []"
                 placeholder="Select a client"
                 class="w-full"
               />

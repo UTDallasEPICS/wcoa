@@ -23,16 +23,18 @@ describe('query-count seam (#45)', () => {
 
   it('stays bounded (not proportional to row count) for a batched list with includes', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
-    const { status, queryCount, body } = await fetchWithQueryCount<unknown[]>('/api/get/rides', {
-      headers: { cookie },
-    })
+    const { status, queryCount, body } = await fetchWithQueryCount<{ items: unknown[] }>(
+      '/api/get/rides',
+      { headers: { cookie } }
+    )
     expect(status).toBe(200)
     // Seed has 9+ rides each with nested client/volunteer includes. Prisma loads
     // includes per-relation-level (a small constant), NOT per row — so the count
-    // must stay bounded regardless of how many rides exist. A per-row N+1 here
+    // must stay bounded regardless of how many rides exist. Pagination (issue
+    // #13) adds one count() query alongside the findMany. A per-row N+1 here
     // would blow past this.
-    expect(Array.isArray(body)).toBe(true)
-    expect(queryCount).toBeLessThanOrEqual(5)
+    expect(Array.isArray(body.items)).toBe(true)
+    expect(queryCount).toBeLessThanOrEqual(6)
   })
 
   it('keeps topRiders batched (issue #24): groupBy + one findMany, not an N+1', async () => {

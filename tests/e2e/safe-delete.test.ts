@@ -28,8 +28,13 @@ describe('safe deletes (#23)', () => {
   it('does not crash (500) when deleting a client with rides — blocks with 409 and preserves data', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
 
-    const clients = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
-    const ridesBefore = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: ClientRow[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
+    const { items: ridesBefore } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie },
+    })
 
     // martha is seeded with rides.
     const martha = clients.find((c) => c.user.email === 'martha@example.com')
@@ -47,9 +52,14 @@ describe('safe deletes (#23)', () => {
     expect(res.status).toBe(409)
 
     // Data preserved: the client and their rides still exist.
-    const clientsAfter = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
+    const { items: clientsAfter } = await $fetch<{ items: ClientRow[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(clientsAfter.some((c) => c.id === martha!.id), 'client must still exist').toBe(true)
-    const ridesAfter = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie } })
+    const { items: ridesAfter } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie },
+    })
     const marthaRidesAfter = ridesAfter.filter((r) => r.clientId === martha!.id)
     expect(marthaRidesAfter.length, 'client rides must be preserved').toBe(marthaRides.length)
   })
@@ -78,7 +88,10 @@ describe('safe deletes (#23)', () => {
     })
     expect(res.status, 'deleting a ride-less client should succeed').toBe(200)
 
-    const clientsAfter = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
+    const { items: clientsAfter } = await $fetch<{ items: ClientRow[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(clientsAfter.some((c) => c.id === created.id)).toBe(false)
   })
 
@@ -98,7 +111,10 @@ describe('safe deletes (#23)', () => {
     expect(vol.id).toBeTruthy()
 
     // Grab any existing client to attach a ride to.
-    const clients = await $fetch<ClientRow[]>('/api/get/clients', { headers: { cookie } })
+    const { items: clients } = await $fetch<{ items: ClientRow[] }>(
+      '/api/get/clients?pageSize=100',
+      { headers: { cookie } }
+    )
     const someClient = clients[0]
     expect(someClient).toBeTruthy()
 
@@ -123,7 +139,9 @@ describe('safe deletes (#23)', () => {
     })
     expect(delRes.status, 'deleting a volunteer should succeed').toBe(200)
 
-    const ridesAfter = await $fetch<Ride[]>('/api/get/rides', { headers: { cookie } })
+    const { items: ridesAfter } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie },
+    })
     const affected = ridesAfter.find((r) => r.id === ride.id)
     expect(affected, 'the ride should still exist').toBeTruthy()
     expect(affected!.volunteerId, 'volunteer link should be cleared').toBeNull()

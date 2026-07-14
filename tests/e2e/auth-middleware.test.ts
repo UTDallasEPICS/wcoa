@@ -66,8 +66,8 @@ describe('API auth middleware (#1, #2)', () => {
 
   it('volunteers keep the access their dashboard needs', async () => {
     const cookie = await loginAs('bob@example.com')
-    const rides = await $fetch('/api/get/rides', { headers: { cookie } })
-    expect(Array.isArray(rides)).toBe(true)
+    const rides = await $fetch<{ items: unknown[] }>('/api/get/rides', { headers: { cookie } })
+    expect(Array.isArray(rides.items)).toBe(true)
 
     const me = await $fetch<{ user: { email: string } }>('/api/get/volunteers/bySession', {
       headers: { cookie },

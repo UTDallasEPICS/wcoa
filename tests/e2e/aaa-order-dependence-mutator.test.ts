@@ -19,14 +19,19 @@ describe('order-dependence: hostile mutator', () => {
   it('deletes every seeded ride and leaves the DB corrupted for the next file', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
 
-    const before = await $fetch<{ id: string }[]>('/api/get/rides', { headers: { cookie } })
+    const { items: before } = await $fetch<{ items: { id: string }[] }>(
+      '/api/get/rides?pageSize=100',
+      { headers: { cookie } }
+    )
     expect(before.length).toBeGreaterThanOrEqual(9)
 
     for (const ride of before) {
       await $fetch(`/api/delete/rides/${ride.id}`, { method: 'DELETE', headers: { cookie } })
     }
 
-    const after = await $fetch<unknown[]>('/api/get/rides', { headers: { cookie } })
+    const { items: after } = await $fetch<{ items: unknown[] }>('/api/get/rides?pageSize=100', {
+      headers: { cookie },
+    })
     expect(after.length).toBe(0)
     // Intentionally no cleanup: later files must not depend on our leftovers.
   })

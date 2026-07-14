@@ -19,7 +19,7 @@ await bootShared()
 type AdminUser = { id: string; email: string; phone: string | null }
 
 async function getAdmin(cookie: string, email: string): Promise<AdminUser> {
-  const admins = await $fetch<AdminUser[]>('/api/get/admins', {
+  const { items: admins } = await $fetch<{ items: AdminUser[] }>('/api/get/admins?pageSize=100', {
     headers: { cookie },
   })
   const a = admins.find((a) => a.email === email)
