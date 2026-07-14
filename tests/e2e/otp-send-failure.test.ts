@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { fetch as appFetch } from '@nuxt/test-utils/e2e'
 import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
@@ -28,16 +28,30 @@ await bootShared()
 // before-hook rejects unknown users before any OTP is issued).
 const SEEDED_EMAIL = 'bob@example.com'
 
-async function armEmailFault(disarm = false): Promise<void> {
-  // Requires an admin session (the _test route is behind the auth middleware).
-  const cookie = await loginAs('reachtusharwani@gmail.com')
+// Admin cookie captured ONCE, before any fault is armed. Arm AND disarm must be
+// independent of loginAs()/OTP-send: routing them through a fresh login would
+// itself hit send-verification-otp, so if the session cache were cold while the
+// 'email-send' fault is armed (e.g. a resetDb()/clearSessionCache() from #62/#72
+// landing mid-test), that login would 500 on the armed fault, the disarm would
+// throw, the global fault would stay armed, and every later loginAs in the
+// serial suite would cascade-fail. Capturing the cookie up front and POSTing
+// arm-fault directly with it keeps both arm and disarm unblockable.
+let adminCookie: string
+
+beforeAll(async () => {
+  adminCookie = await loginAs('reachtusharwani@gmail.com')
+})
+
+async function setEmailFault(armed: boolean): Promise<void> {
+  // The _test route is behind the auth middleware, so it needs the admin cookie
+  // — but never a fresh login (see the note above).
   const res = await appFetch('/api/_test/arm-fault', {
     method: 'POST',
-    headers: { cookie, 'content-type': 'application/json' },
-    body: JSON.stringify({ label: 'email-send', disarm }),
+    headers: { cookie: adminCookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ label: 'email-send', disarm: !armed }),
   })
   if (res.status !== 200) {
-    throw new Error(`arm-fault(${disarm ? 'disarm' : 'arm'}) failed: ${res.status}`)
+    throw new Error(`arm-fault(${armed ? 'arm' : 'disarm'}) failed: ${res.status}`)
   }
 }
 
@@ -56,12 +70,13 @@ async function sendOtp(email: string): Promise<number> {
 
 describe('OTP send surfaces email failures (#25)', () => {
   afterEach(async () => {
-    // Never leak the armed fault into other tests / files.
-    await armEmailFault(true)
+    // Always runs, using the pre-captured admin cookie, so the global fault can
+    // never leak into other tests / files even if an assertion above threw.
+    await setEmailFault(false)
   })
 
   it('reports a failure when the OTP email cannot be sent', async () => {
-    await armEmailFault()
+    await setEmailFault(true)
     const status = await sendOtp(SEEDED_EMAIL)
     // Pre-fix: the swallowed send still returns 200 (false success) -> FAILS.
     // Post-fix: the hook throws on a failed send -> non-2xx.
