@@ -61,7 +61,8 @@ The variables the app actually reads:
 | `TRUSTED_ORIGINS` | optional | Comma-separated extra origins trusted for CSRF/Origin validation. |
 | `EMAIL_USER` | optional | Gmail address used to send notifications. |
 | `EMAIL_PASS` | optional | Gmail **app password** (not your account password — Gmail requires an app-specific password for SMTP). |
-| `NUXT_PUBLIC_GOOGLE_MAPS_API_KEY` | optional | Google Maps API key for the ride map / distance estimate features. Overrides `runtimeConfig.public.googleMapsApiKey`. |
+| `NUXT_GOOGLE_MAPS_API_KEY` | optional | **Server-only** Google Maps key for the Directions API distance/duration estimate. Never shipped to the browser. Overrides `runtimeConfig.googleMapsApiKey`. Restrict by IP/API in Google Cloud. |
+| `NUXT_PUBLIC_GOOGLE_MAPS_API_KEY` | optional | **Client-visible** Google Maps key for the ride map *embed* iframe. Ships to the browser by design, so it must be a **different** Cloud key that is **HTTP-referrer-restricted** and scoped to the Maps Embed API (issue #30). Overrides `runtimeConfig.public.googleMapsApiKey`. |
 
 Email is optional for local development: if `EMAIL_USER` / `EMAIL_PASS` are
 unset, sends fail and the failure is swallowed, so the app still runs and you

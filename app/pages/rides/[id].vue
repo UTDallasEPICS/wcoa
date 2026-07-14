@@ -193,6 +193,10 @@
     if (!ride.value) return ''
     const origin = encodeURIComponent(ride.value.pickupDisplay)
     const destination = encodeURIComponent(ride.value.dropoffDisplay)
+    // Issue #30: the PUBLIC key is correct here — the Maps Embed iframe runs in
+    // the browser and needs a client-visible key. It MUST be a DIFFERENT Google
+    // Cloud key from the server-only Directions key, HTTP-referrer-restricted
+    // and scoped to the Maps Embed API (owner action in Google Cloud Console).
     const apiKey = useRuntimeConfig().public.googleMapsApiKey
     return `https://www.google.com/maps/embed/v1/directions?key=${apiKey || ''}&origin=${origin}&destination=${destination}`
   })

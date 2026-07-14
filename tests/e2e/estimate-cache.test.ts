@@ -8,12 +8,16 @@ await bootShared()
 
 // Issue #14: GET /api/get/rides/estimate/:id must serve a cached
 // distance/duration from the Ride record instead of hitting the Google Maps
-// Directions API on every load. The test env has no API key, so a cache MISS
-// returns { error: 'Maps API Key not configured', ...nulls }. By populating the
-// cache columns directly in the DB, a cache HIT must instead return the cached
-// values with error: null — which is only possible once the endpoint reads and
-// serves the cache. (Before the fix the endpoint ignores the cache columns and
-// returns the "not configured" miss response, so this test fails.)
+// Directions API on every load. By populating the cache columns directly in the
+// DB, a cache HIT must return the cached values with error: null — which is only
+// possible once the endpoint reads and serves the cache. (Before the fix the
+// endpoint ignores the cache columns, so this test fails.)
+//
+// Note (issue #30): the harness now sets a bogus SERVER-ONLY Maps key, so a
+// cache MISS no longer returns 'Maps API Key not configured' — it gets past the
+// "not configured" gate and returns a live-attempt error instead. The
+// invalidation test below therefore asserts "values nulled + error present"
+// rather than the exact miss string.
 
 function db(): Database.Database {
   const dbPath = (process.env.DATABASE_URL ?? '').replace(/^file:/, '')
@@ -111,12 +115,13 @@ describe('ride estimate caching (issue #14)', () => {
       body: { dropoffDisplay: 'A Completely New Destination, TX' },
     })
 
-    // With the cache cleared and no API key configured, we're back to the miss
-    // response rather than stale cached values.
+    // With the cache cleared, we're back to a miss: the stale cached values are
+    // gone (nulled) and the response carries an error. (The exact error string
+    // depends on the live Directions attempt; see the #30 note at the top.)
     const miss = await $fetch<EstimateResponse>(`/api/get/rides/estimate/${id}`, {
       headers: { cookie },
     })
-    expect(miss.error).toBe('Maps API Key not configured')
+    expect(miss.error).not.toBe(null)
     expect(miss.distance).toBe(null)
     expect(miss.durationValue).toBe(null)
   })
