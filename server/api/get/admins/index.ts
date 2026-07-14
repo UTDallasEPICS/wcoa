@@ -25,7 +25,9 @@ export default defineEventHandler(async (event) => {
   const [items, total] = await prisma.$transaction([
     prisma.user.findMany({
       where,
-      orderBy: { name: 'asc' },
+      // `id` tiebreaker keeps admins with identical names in a stable order
+      // across pages (skip/take is otherwise non-deterministic on ties).
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
       skip,
       take,
     }),

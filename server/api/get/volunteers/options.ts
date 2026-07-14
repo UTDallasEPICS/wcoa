@@ -5,9 +5,11 @@ import { prisma } from '../../../utils/prisma'
 // (app/pages/rides/[id].vue). The full roster endpoint (./index) is paginated
 // for issue #13; these pickers need the assignable roster at once.
 //
-// Only AVAILABLE volunteers can be assigned, so the picker only lists those.
-// Minimal shape: id + name (no phone/email PII). Still hard-capped so it can
-// never become an unbounded query (the issue #13 point).
+// Returns ALL non-deleted volunteers (not just AVAILABLE): on main the pickers
+// used /api/get/volunteers, which returned every status, so an admin could
+// assign any volunteer. Issue #13 is a pagination change and must not narrow
+// assignment policy. Minimal shape: id + name (no phone/email PII). Hard-capped
+// so it can never become an unbounded query (the issue #13 point).
 const OPTIONS_CAP = 500
 
 export default defineEventHandler(async (event) => {
@@ -15,12 +17,12 @@ export default defineEventHandler(async (event) => {
   requireAdmin(event)
 
   const volunteers = await prisma.volunteer.findMany({
-    where: { deletedAt: null, status: 'AVAILABLE' },
+    where: { deletedAt: null },
     select: {
       id: true,
       user: { select: { name: true } },
     },
-    orderBy: { user: { name: 'asc' } },
+    orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
     take: OPTIONS_CAP,
   })
 

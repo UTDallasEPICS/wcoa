@@ -135,19 +135,76 @@ describe('dropdown options endpoints (#13)', () => {
     }
   })
 
-  it('/api/get/volunteers/options returns AVAILABLE volunteers as { id, name }', async () => {
+  it('/api/get/volunteers/options returns all volunteers as { id, name }', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
     const vols = await $fetch<Array<{ id: string; name: string }>>(
       '/api/get/volunteers/options',
       { headers: { cookie } }
     )
     expect(Array.isArray(vols)).toBe(true)
-    // All 3 seeded volunteers are AVAILABLE.
-    expect(vols.length).toBe(3)
+    // Assignment policy is unchanged from main: every (non-deleted) volunteer is
+    // assignable, not only AVAILABLE ones. Seed has 3 volunteers.
+    expect(vols.length).toBeGreaterThanOrEqual(3)
     for (const v of vols) {
       expect(typeof v.id).toBe('string')
       expect(typeof v.name).toBe('string')
       expect(v).not.toHaveProperty('user')
+    }
+  })
+})
+
+// The rides dashboard's default exclude set sends `status:CANCELLED` (see
+// app/utils/rideFilters DEFAULT_EXCLUDED_FILTERS). CANCELLED became a real
+// RideStatus in issue #5, so the server's status whitelist must honor it —
+// otherwise the chip is a no-op and cancelled rides leak into the default view.
+// (The seed has no cancelled rides, so we create + cancel a throwaway one and
+// clean it up afterward.)
+describe('CANCELLED status filtering (#13 x #5)', () => {
+  it('honors include/exclude of status:CANCELLED', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+
+    const clients = await $fetch<Array<{ id: string }>>('/api/get/clients/options', {
+      headers: { cookie },
+    })
+    const clientId = clients[0]!.id
+
+    const created = await $fetch<{ id: string }>('/api/post/rides', {
+      method: 'POST',
+      headers: { cookie },
+      body: {
+        clientId,
+        pickup: { street: '1 Cancel Test St', city: 'Dallas', state: 'TX', zip: '75001' },
+        dropoff: { street: '2 Cancel Test Ave', city: 'Dallas', state: 'TX', zip: '75002' },
+        scheduledTime: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+      },
+    })
+    const rideId = created.id
+
+    try {
+      await $fetch(`/api/put/rides/${rideId}`, {
+        method: 'PUT',
+        headers: { cookie },
+        body: { status: 'CANCELLED' },
+      })
+
+      // Excluding CANCELLED must actually drop it. Pre-fix (CANCELLED missing
+      // from VALID_STATUSES) the chip is silently dropped and the cancelled
+      // ride leaks into the excluded result.
+      const excluded = await $fetch<RideEnvelope>(
+        '/api/get/rides?exclude=status:COMPLETED,status:CANCELLED&pageSize=100',
+        { headers: { cookie } }
+      )
+      expect(excluded.items.some((r) => r.id === rideId)).toBe(false)
+
+      // Including CANCELLED must surface it.
+      const included = await $fetch<RideEnvelope>(
+        '/api/get/rides?include=status:CANCELLED&pageSize=100',
+        { headers: { cookie } }
+      )
+      expect(included.items.some((r) => r.id === rideId)).toBe(true)
+    } finally {
+      // Soft-delete the throwaway ride so it leaves the shared seed DB clean.
+      await $fetch(`/api/delete/rides/${rideId}`, { method: 'DELETE', headers: { cookie } })
     }
   })
 })

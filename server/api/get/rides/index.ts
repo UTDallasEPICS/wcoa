@@ -2,10 +2,10 @@ import { Prisma } from '../../../../prisma/generated/client'
 import { prisma } from '../../../utils/prisma'
 import { getPageParams, getStringParam } from '../../../utils/pagination'
 
-// Only these statuses exist in the RideStatus enum (CANCELLED is dead — see
-// issues #5/#22). Whitelist filter input against this so a bogus `?include`
-// value can never crash the Prisma query with an invalid enum.
-const VALID_STATUSES = new Set(['CREATED', 'ASSIGNED', 'COMPLETED'])
+// The full RideStatus enum (CANCELLED became a real status in issue #5).
+// Whitelist filter input against this so a bogus `?include` value can never
+// crash the Prisma query with an invalid enum.
+const VALID_STATUSES = new Set(['CREATED', 'ASSIGNED', 'COMPLETED', 'CANCELLED'])
 
 // Parse a comma-separated filter list (e.g. "status:CREATED,assign:ME") into a
 // set of statuses plus whether the caller wants rides assigned to themselves.
@@ -118,7 +118,10 @@ export default defineEventHandler(async (event) => {
         client: { include: { user: true } },
         volunteer: { include: { user: true } },
       },
-      orderBy: { scheduledTime: sort },
+      // `id` is a stable, unique tiebreaker so rides with an identical
+      // scheduledTime keep a deterministic order across pages (otherwise
+      // skip/take could drop or duplicate a tied row).
+      orderBy: [{ scheduledTime: sort }, { id: 'asc' }],
       skip,
       take,
     }),

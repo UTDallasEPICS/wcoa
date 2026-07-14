@@ -31,7 +31,9 @@ export default defineEventHandler(async (event) => {
     prisma.client.findMany({
       where,
       include: { user: true, homeAddress: true },
-      orderBy: { user: { name: 'asc' } },
+      // `id` tiebreaker keeps clients with identical names in a stable order
+      // across pages (skip/take is otherwise non-deterministic on ties).
+      orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
       skip,
       take,
     }),

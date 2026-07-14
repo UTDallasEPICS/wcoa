@@ -35,7 +35,9 @@ export default defineEventHandler(async (event) => {
     prisma.volunteer.findMany({
       where,
       include: { user: true },
-      orderBy: { user: { name: 'asc' } },
+      // `id` tiebreaker keeps volunteers with identical names in a stable order
+      // across pages (skip/take is otherwise non-deterministic on ties).
+      orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
       skip,
       take,
     }),

@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
       user: { select: { name: true } },
       homeAddress: true,
     },
-    orderBy: { user: { name: 'asc' } },
+    orderBy: [{ user: { name: 'asc' } }, { id: 'asc' }],
     take: OPTIONS_CAP,
   })
 
