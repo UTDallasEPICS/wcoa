@@ -18,10 +18,12 @@ type AuditEntry = {
  * already put on the event (`event.context.auth`, via getAuth) — the same
  * source the authz guards use — so callers don't re-run the session lookup.
  *
- * Fire-and-forget by contract: an audit-write failure MUST NEVER break or fail
- * the underlying action. Everything is wrapped in try/catch and errors are
- * swallowed + logged, mirroring the codebase's non-blocking style (sendEmail,
- * broadcastNotification). Call this AFTER the action has succeeded.
+ * Non-failing by contract: an audit-write failure MUST NEVER break or fail the
+ * underlying action. Everything is wrapped in try/catch and errors are swallowed
+ * + logged. Callers DO await this (so the audit row is durably written before
+ * the response — durability matters more than shaving one indexed INSERT of
+ * latency), but because it can never throw, awaiting it can't fail the request.
+ * Call this AFTER the action has succeeded.
  */
 export async function writeAuditLog(event: H3Event, entry: AuditEntry): Promise<void> {
   try {

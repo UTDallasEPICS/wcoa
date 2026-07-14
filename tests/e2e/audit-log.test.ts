@@ -92,6 +92,57 @@ describe('Audit logging system (issue #28)', () => {
     expect(entry!.userId).toBe(userIdByEmail('reachtusharwani@gmail.com'))
   })
 
+  it('logs an admin unassign as RIDE_UNASSIGNED, not RIDE_CREATED (no collision with ride creation)', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+
+    // Start from a CREATED ride and borrow a volunteer id from any seeded ride.
+    const rides = await getRides(cookie)
+    const ride = rides.find((r) => r.status === 'CREATED' && !touchedRideIds.has(r.id))
+    expect(ride, 'seed should have an untouched CREATED ride').toBeTruthy()
+    touchedRideIds.add(ride!.id)
+    const volunteerId = rides.find((r) => r.volunteerId)?.volunteerId
+    expect(volunteerId, 'seed should have a ride with a volunteer').toBeTruthy()
+
+    // Assign, then unassign. The unassign auto-resets status ASSIGNED->CREATED
+    // (issue #7); pre-fix that made the audit log RIDE_CREATED, colliding with
+    // actual ride creation.
+    await $fetch(`/api/put/rides/${ride!.id}`, {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: { volunteerId, status: 'ASSIGNED' },
+    })
+    const unassigned = await $fetch<Ride>(`/api/put/rides/${ride!.id}`, {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: { volunteerId: '' },
+    })
+    expect(unassigned.status).toBe('CREATED')
+    expect(unassigned.volunteerId).toBeNull()
+
+    // The unassign is logged as RIDE_UNASSIGNED...
+    const unassignLogs = await $fetch<AuditLog[]>('/api/get/audit', {
+      headers: { cookie },
+      query: { action: 'RIDE_UNASSIGNED' },
+    })
+    expect(
+      unassignLogs.find((l) => l.targetId === ride!.id),
+      'expected a RIDE_UNASSIGNED audit row for the unassigned ride',
+    ).toBeTruthy()
+
+    // ...and NOT as RIDE_CREATED. The pre-fix collision logged the ASSIGNED->CREATED
+    // auto-unassign as RIDE_CREATED (details.from === 'ASSIGNED'); assert no such
+    // row exists (a genuine RIDE_CREATED would have from CANCELLED/other, e.g. the
+    // afterEach cleanup restore — so match on details.from to target the collision).
+    const createdLogs = await $fetch<AuditLog[]>('/api/get/audit', {
+      headers: { cookie },
+      query: { action: 'RIDE_CREATED' },
+    })
+    const collision = createdLogs.find(
+      (l) => l.targetId === ride!.id && (l.details as { from?: string } | null)?.from === 'ASSIGNED',
+    )
+    expect(collision, 'unassigning (ASSIGNED->CREATED) must NOT log RIDE_CREATED').toBeFalsy()
+  })
+
   it('caps the result set (bounded, not unbounded)', async () => {
     const cookie = await loginAs('reachtusharwani@gmail.com')
     const logs = await $fetch<AuditLog[]>('/api/get/audit', { headers: { cookie } })
