@@ -1,0 +1,140 @@
+import { expect, test } from '@playwright/test'
+import { dbGet, loginViaUi } from './utils'
+
+// Admin user flows (REQUIREMENTS.md §14): R-291..R-298, R-300, R-302..R-305.
+// Single worker; tests in this file share the seeded browser DB.
+
+test.beforeEach(async ({ page }) => {
+  await loginViaUi(page, 'reachtusharwani@gmail.com')
+})
+
+test('R-291/R-292: admin nav + dashboard metric cards render with data', async ({ page }) => {
+  for (const item of ['Dashboard', 'Rides', 'People', 'Notifications', 'Audit Log']) {
+    await expect(page.getByRole('navigation').getByText(item)).toBeVisible()
+  }
+  await expect(page.getByText('Ride Completion Rate')).toBeVisible()
+  await expect(page.getByText('Total Hours Ridden')).toBeVisible()
+  await expect(page.getByText('Top Riders')).toBeVisible()
+  // The completion card shows a percentage derived from the seeded rides.
+  await expect(page.getByText(/\d+%/).first()).toBeVisible()
+})
+
+test('R-293: rides list renders seeded rows; search narrows them server-side', async ({ page }) => {
+  await page.goto('/rides')
+  await expect(page.getByText('Martha Jenkins').first()).toBeVisible()
+
+  const searchResponse = page.waitForResponse((r) => r.url().includes('/api/get/rides') && r.url().includes('search='))
+  await page.getByPlaceholder('Search...').fill('Sarah')
+  await searchResponse
+  await expect(page.getByText('Sarah Connor').first()).toBeVisible()
+  await expect(page.getByText('Martha Jenkins')).toHaveCount(0)
+})
+
+test('R-294/R-305: Create Ride modal — client select auto-fills pickup; create succeeds with a toast', async ({ page }) => {
+  await page.goto('/rides')
+  await page.getByRole('button', { name: 'Create Ride' }).click()
+
+  await page.getByRole('combobox').first().click()
+  await page.getByRole('option', { name: 'Martha Jenkins' }).click()
+  // Auto-fill (R-294): Martha's seeded home address lands in the pickup fields.
+  await expect(page.getByPlaceholder('Street Address').first()).toHaveValue(/1501 H Avenue/i)
+
+  await page.getByPlaceholder('Street Address').nth(1).fill('800 W Campbell Rd')
+  await page.getByPlaceholder('City').nth(1).fill('Richardson')
+  await page.getByPlaceholder('State').nth(1).fill('TX')
+  await page.getByPlaceholder('Zip').nth(1).fill('75080')
+  // Appointment Time is required — set the datetime-local field explicitly.
+  await page.locator('input[type="datetime-local"]').first().fill('2026-08-01T14:30')
+  await page.locator('textarea').fill('browser-suite ride')
+
+  // Wait on the actual create request rather than a toast string (robust to
+  // copy changes); a 200 is the contract.
+  const created = page.waitForResponse(
+    (r) => r.url().includes('/api/post/rides') && r.request().method() === 'POST'
+  )
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  expect((await created).status()).toBe(200)
+
+  // Persisted (not just optimistic UI):
+  await expect
+    .poll(() => dbGet<{ notes: string }>(`SELECT notes FROM ride WHERE notes = 'browser-suite ride'`)?.notes)
+    .toBe('browser-suite ride')
+})
+
+test('R-296/R-297/R-298: ride detail — cancel confirm flow, Navigate deep-link, map fallback', async ({ page }) => {
+  // Self-contained: cancel any CREATED, unassigned, non-archived seeded ride
+  // (decoupled from other tests so run order / server reuse can't break it).
+  const ride = dbGet<{ id: string }>(
+    `SELECT id FROM ride WHERE status = 'CREATED' AND volunteerId IS NULL AND deletedAt IS NULL ORDER BY scheduledTime DESC LIMIT 1`
+  )
+  expect(ride).toBeTruthy()
+  await page.goto(`/rides/${ride!.id}`)
+
+  // R-297: encoded Google Maps deep link
+  const nav = page.getByRole('link', { name: /Navigate/ })
+  await expect(nav).toHaveAttribute('href', /google\.com\/maps\/dir\/\?api=1&origin=.+&destination=.+/)
+
+  // R-298: with no embed key the map degrades to the friendly placeholder
+  await expect(page.getByText(/Map API Key missing/i)).toBeVisible()
+
+  // R-296: cancel with confirm modal → CANCELLED badge, cancel button gone
+  await page.getByRole('button', { name: 'Cancel Ride' }).click()
+  await expect(page.getByText(/Are you sure you want to cancel/)).toBeVisible()
+  await page.getByRole('button', { name: 'Cancel Ride' }).last().click()
+  // The status badge (exact) — not the toast text which also contains "cancelled".
+  await expect(page.getByText('CANCELLED', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel Ride' })).toHaveCount(0)
+
+  const status = dbGet<{ status: string }>(`SELECT status FROM ride WHERE id = ?`, ride!.id)
+  expect(status?.status).toBe('CANCELLED')
+})
+
+test('R-300: people page — tabs render rosters; edit modal prefills every field', async ({ page }) => {
+  await page.goto('/people')
+  await expect(page.getByText('bob@example.com')).toBeVisible()
+
+  // The Volunteers/Clients/Admins switcher is a segmented control; match by text.
+  await page.getByText('Clients', { exact: true }).click()
+  await expect(page.getByText('martha@example.com')).toBeVisible()
+
+  await page.getByText('Volunteers', { exact: true }).click()
+  await expect(page.getByText('bob@example.com')).toBeVisible()
+  // Open the edit modal for the first volunteer row.
+  await page.locator('tbody tr').first().locator('button').first().click()
+  // Scope to the dialog so we don't grab the page's "Search people..." box.
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('input').first()).not.toHaveValue('')
+})
+
+test('R-302: notification templates page shows all five cards', async ({ page }) => {
+  await page.goto('/admin/notifications')
+  for (const name of ['RIDE_ASSIGNED', 'RIDE_CANCELLED', 'RIDE_COMPLETED', 'RIDE_CREATED', 'RIDE_REMINDER']) {
+    await expect(page.getByText(name, { exact: true })).toBeVisible()
+  }
+})
+
+test('R-303: audit page renders the trail of this suite\'s own actions', async ({ page }) => {
+  await page.goto('/admin/audit')
+  await expect(page.getByRole('heading', { name: 'Audit Log' })).toBeVisible()
+  // The cancel test above must have produced a RIDE_CANCELLED row.
+  await expect(page.getByText('RIDE_CANCELLED').first()).toBeVisible()
+})
+
+// R-304 / issue #98: hydration-mismatch diagnostic. The mismatch was observed
+// in the audit but reproduces intermittently (it did not surface on this
+// separate prod build), so this is a NON-GATING diagnostic that records the
+// count rather than a flaky negative pin. R-304 is tracked as `manual` in
+// REQUIREMENTS.md against #98; tighten this to a hard assertion once the fix
+// makes the page reliably clean.
+test('R-304 (#98): hydration-mismatch diagnostic (non-gating)', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text())
+  })
+  await page.goto('/rides')
+  await page.waitForLoadState('networkidle')
+  const hydration = errors.filter((e) => /hydration/i.test(e))
+  if (hydration.length) console.warn(`[R-304/#98] hydration mismatches on /rides: ${hydration.length}`)
+  expect(true).toBe(true)
+})
