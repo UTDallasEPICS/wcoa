@@ -214,7 +214,7 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(estimate.status).toBe(404)
   })
 
-  it.fails('R-114/R-158 (#94): missing-record GETs return 404, not 204 null', async () => {
+  it('R-114/R-158 (#94): missing-record GETs return 404, not 204 null', async () => {
     const admin = await loginAs(ADMIN)
     const ride = await appFetch('/api/get/rides/byId/nonexistent-id', { headers: { cookie: admin } })
     expect(ride.status).toBe(404)

@@ -28,6 +28,14 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  // Missing/archived ride is gone for everyone (issue #94): return 404 rather
+  // than falling through to a null body (which Nitro serializes as 204). The
+  // admin path skips the non-admin scoping block below, so without this check
+  // an admin would get a 204 for a truly-missing ride.
+  if (!ride) {
+    throw createError({ statusCode: 404, statusMessage: 'Ride not found' })
+  }
+
   // Record-level scoping (issue #41, same class as #3): a non-admin may only
   // retrieve a ride that is available to sign up for (CREATED) or that is
   // assigned to them — never another volunteer's ride and its client PII.
