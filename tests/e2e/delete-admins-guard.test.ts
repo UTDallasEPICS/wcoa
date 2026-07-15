@@ -33,7 +33,11 @@ type AdminRow = { id: string; email: string | null }
 type VolunteerRow = { id: string; userId: string; deletedAt: string | null; user: { email: string | null } }
 
 async function getUsers(cookie: string): Promise<UserRow[]> {
-  return await $fetch<UserRow[]>('/api/get/users', { headers: { cookie } })
+  // #97: get/users is now paginated ({items,total,...}) like the other lists.
+  const { items } = await $fetch<{ items: UserRow[] }>('/api/get/users?pageSize=100', {
+    headers: { cookie },
+  })
+  return items
 }
 
 async function getAdmins(cookie: string): Promise<AdminRow[]> {

@@ -15,10 +15,12 @@ await bootShared()
 const uniq = () => Math.random().toString(36).slice(2, 10)
 
 async function getUsers(cookie: string) {
-  return await $fetch<Array<{ id: string; email: string | null }>>(
-    '/api/get/users',
+  // #97: get/users is now paginated ({items,total,...}) like the other lists.
+  const { items } = await $fetch<{ items: Array<{ id: string; email: string | null }> }>(
+    '/api/get/users?pageSize=100',
     { headers: { cookie } }
   )
+  return items
 }
 
 describe('issue #8 — deletion removes the parent User (no orphans)', () => {

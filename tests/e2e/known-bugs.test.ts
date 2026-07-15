@@ -240,9 +240,10 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect([400, 409]).toContain(res.status)
   })
 
-  it.fails('R-155 (#97): get/users returns a bounded pagination envelope', async () => {
+  it('R-155 (#97): get/users returns a bounded pagination envelope', async () => {
     const admin = await loginAs(ADMIN)
-    // Currently: a bare unbounded array.
+    // Fixed (#97): a bounded {items,total,page,pageSize} envelope (was a bare
+    // unbounded array) — mirrors the volunteers/admins list from #13.
     const res = await $fetch<{ items: unknown[]; total: number }>('/api/get/users', {
       headers: { cookie: admin },
     })
