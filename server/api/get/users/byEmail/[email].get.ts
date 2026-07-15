@@ -23,6 +23,12 @@ export default defineEventHandler(async (event) => {
     },
   })
 
+  // Missing/archived user is gone (issue #94): return 404 rather than a null
+  // body, which Nitro serializes as 204 No Content.
+  if (!user) {
+    throw createError({ statusCode: 404, statusMessage: 'User not found' })
+  }
+
   return user
 })
 

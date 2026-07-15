@@ -111,7 +111,7 @@ is not documentation that can rot — it is enforced.
 | R-111 | Update/complete/signup against an archived ride → 404 (#27) | `put/rides`, signup | auto | `soft-deletes.test.ts` |
 | R-112 | Changing pickup/dropoff display invalidates the cached Maps estimate (#14) | `put/rides/[id].ts` | auto | `estimate-cache.test.ts` |
 | R-113 | Ride delete is a soft-delete: hidden from lists/byId/estimate, row + history preserved (#27) | `delete/rides/[id].ts` | auto | `soft-deletes.test.ts` |
-| R-114 | `get/rides/byId` of a missing/archived ride → 404 for every role (currently 204 null for admins) | `get/rides/byId/[id].ts` | pin [#94](https://github.com/UTDallasEPICS/wcoa/issues/94) | `known-bugs.test.ts` |
+| R-114 | `get/rides/byId` of a missing/archived ride → 404 for every role | `get/rides/byId/[id].ts` | auto | `known-bugs.test.ts` |
 | R-115 | Estimate endpoint: serves cache when `estimatedAt` set; on miss with no server key returns a clean "not configured" payload (never the public embed key — #30) | `estimate/[id].ts` | auto | `estimate-cache.test.ts`, `maps-key-split.test.ts` |
 
 ## 7. Rides — volunteer self-service (signup / unsignup / complete)
@@ -137,7 +137,7 @@ is not documentation that can rot — it is enforced.
 | R-155 | `get/users` is bounded/paginated like every other list | `get/users/index.ts` | pin [#97](https://github.com/UTDallasEPICS/wcoa/issues/97) | `known-bugs.test.ts` |
 | R-156 | `get/audit` is capped (≤100) with action/userId filters | `get/audit/index.ts` | auto | `audit-log.test.ts` |
 | R-157 | `get/addresses` is bounded and returns `{id, label, address}` for the typeahead; `/options` endpoints are bounded dropdown feeds | `get/addresses`, `*/options` | auto | `address-search.test.ts`, `pagination.test.ts` |
-| R-158 | `users/byEmail` & `users/byId` of an unknown user → 404, not 204 null | `get/users/*` | pin [#94](https://github.com/UTDallasEPICS/wcoa/issues/94) | `known-bugs.test.ts` |
+| R-158 | `users/byEmail` & `users/byId` of an unknown user → 404, not 204 null | `get/users/*` | auto | `known-bugs.test.ts` |
 
 ## 9. Metrics
 
