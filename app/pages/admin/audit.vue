@@ -76,7 +76,7 @@ function formatDetails(details: unknown): string {
             :key="log.id"
             class="border-t border-gray-100 dark:border-gray-800"
           >
-            <td class="px-3 py-2 whitespace-nowrap">{{ new Date(log.createdAt).toLocaleString() }}</td>
+            <td class="px-3 py-2 whitespace-nowrap">{{ formatDateTime(log.createdAt) }}</td>
             <td class="px-3 py-2">
               <UBadge variant="subtle">{{ log.action }}</UBadge>
             </td>

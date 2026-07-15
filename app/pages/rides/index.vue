@@ -291,7 +291,8 @@
       accessorKey: 'scheduledTime',
       header: 'Date',
       cell: ({ row }) => {
-        return new Date(row.getValue('scheduledTime')).toLocaleString('en-US', {
+        // Pinned locale + timezone so SSR and client agree (issue #98).
+        return formatDateTime(row.getValue('scheduledTime'), {
           day: 'numeric',
           month: 'short',
           year: 'numeric',

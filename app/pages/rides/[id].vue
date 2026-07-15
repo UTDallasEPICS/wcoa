@@ -270,14 +270,14 @@
             <div>
               <p class="text-sm text-gray-500">Appointment Time</p>
               <p class="font-medium">
-                {{ new Date(ride.scheduledTime).toLocaleString() }}
+                {{ formatDateTime(ride.scheduledTime) }}
               </p>
             </div>
 
             <div v-if="ride.pickupTime">
               <p class="text-error text-sm text-gray-500">Pick Up Time</p>
               <p class="text-error font-bold">
-                {{ new Date(ride.pickupTime).toLocaleString() }}
+                {{ formatDateTime(ride.pickupTime) }}
               </p>
             </div>
 
