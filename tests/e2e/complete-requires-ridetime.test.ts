@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { $fetch } from '@nuxt/test-utils/e2e'
+import { $fetch, fetch as appFetch } from '@nuxt/test-utils/e2e'
 import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
@@ -54,7 +54,15 @@ afterEach(async () => {
   if (!touchedRideIds.size) return
   const cookie = await loginAs('reachtusharwani@gmail.com')
   for (const id of touchedRideIds) {
-    await put(cookie, id, { volunteerId: '', status: 'CREATED' })
+    // Best-effort reset via non-throwing appFetch: since #95, a COMPLETED ride
+    // is terminal and its status can no longer be changed back to CREATED (that
+    // returns 409). A ride left COMPLETED here is harmless — the seed DB is
+    // reset per-file and each test picks its own untouched CREATED ride.
+    await appFetch(`/api/put/rides/${id}`, {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ volunteerId: '', status: 'CREATED' }),
+    })
   }
   touchedRideIds.clear()
 })
