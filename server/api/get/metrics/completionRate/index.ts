@@ -13,8 +13,13 @@ export default defineEventHandler(async (event) => {
   // Soft delete (issue #27): metrics DELIBERATELY do NOT filter deletedAt —
   // soft-deleted rides must still count so historical completion rate is
   // preserved. Preserving history is the entire point of soft-delete here.
+  //
+  // CANCELLED rides ARE excluded from the denominator (issue #96): a cancelled
+  // ride is not a missed completion, so counting it would drag the dashboard
+  // completion % down as if a volunteer no-showed. Soft-deleted rides are still
+  // counted (that is deliberate, #27) — only status CANCELLED drops out.
   const totalRides = await prisma.ride.count({
-    where: dateFilter
+    where: { ...dateFilter, status: { not: 'CANCELLED' } }
   })
   
   if (totalRides === 0) {

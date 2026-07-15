@@ -248,8 +248,8 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(typeof res.total).toBe('number')
   })
 
-  // ---- Decision pin (not a bug pin): flips when the owner decides #96.
-  it('R-173 (#96): CURRENT behavior — CANCELLED rides count in the completionRate denominator', async () => {
+  // ---- #96 decision implemented: CANCELLED is excluded from the denominator.
+  it('R-173 (#96): CANCELLED rides are excluded from the completionRate denominator', async () => {
     const admin = await loginAs(ADMIN)
     const before = await $fetch<{ total: number; completed: number }>(
       '/api/get/metrics/completionRate', { headers: { cookie: admin } }
@@ -262,10 +262,10 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     const after = await $fetch<{ total: number; completed: number }>(
       '/api/get/metrics/completionRate', { headers: { cookie: admin } }
     )
-    // If you are here because this started failing: the denominator decision
-    // (#96) was implemented. Update this assertion to `before.total` and move
-    // the test into requirements-flows.test.ts.
-    expect(after.total).toBe(before.total + 1)
+    // The created-then-cancelled ride nets zero in the denominator: +1 while it
+    // was CREATED, −1 once CANCELLED (now excluded, #96). Soft-deleted rides are
+    // still counted (that part is deliberate, #27).
+    expect(after.total).toBe(before.total)
     expect(after.completed).toBe(before.completed)
   })
 })

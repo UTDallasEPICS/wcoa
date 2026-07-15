@@ -146,7 +146,7 @@ is not documentation that can rot — it is enforced.
 | R-170 | All three metrics are admin-only (#41) | metrics handlers | auto | `requirements-authz-matrix.test.ts` |
 | R-171 | completionRate = completed/total ×100 rounded, with optional date range; returns zeros for an empty range | completionRate | auto | `metrics-date-range.test.ts`, `requirements-flows.test.ts` |
 | R-172 | Metrics deliberately INCLUDE soft-deleted rows (history preservation is the point of soft-delete, #27) | all metrics | auto | `soft-deletes.test.ts` |
-| R-173 | Whether CANCELLED rides belong in the completionRate denominator | completionRate | decision [#96](https://github.com/UTDallasEPICS/wcoa/issues/96) | `known-bugs.test.ts` (pins current include-CANCELLED behavior) |
+| R-173 | CANCELLED rides are excluded from the completionRate denominator (soft-deleted rides still counted, #27) | completionRate | auto | `known-bugs.test.ts` |
 | R-174 | hours = sum of totalRideTime over COMPLETED rides in range | hours | auto | `requirements-flows.test.ts` |
 | R-175 | topRiders: top 5 clients by completed rides, default year-to-date, batched lookup (no N+1, #24) | topRiders | auto | `topRiders-n1.test.ts` |
 | R-176 | Date ranges: endDate inclusive of the entire end day (#18) | `server/utils/dateRange.ts` | auto | `metrics-date-range.test.ts` |
