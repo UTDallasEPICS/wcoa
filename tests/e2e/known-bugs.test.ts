@@ -98,6 +98,29 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     if (!res.ok) await appFetch(`/api/delete/admins/${created.id}`, { method: 'DELETE', headers: json(admin) })
   })
 
+  it('R-085 (#105): put/admins refuses to edit a non-admin user', async () => {
+    const admin = await loginAs(ADMIN)
+    const bob = await loginAs(BOB)
+    // Resolve bob's (a VOLUNTEER) userId and snapshot his current name.
+    const bobVol = await $fetch<{ userId: string }>('/api/get/volunteers/bySession', {
+      headers: { cookie: bob },
+    })
+    const before = await $fetch<{ name: string }>(`/api/get/users/byId/${bobVol.userId}`, {
+      headers: { cookie: admin },
+    })
+    // Before the fix: 200 — put/admins edits ANY user by id (no role filter),
+    // renaming the volunteer's user row. Now: 404, mirroring delete/admins.
+    const res = await appFetch(`/api/put/admins/${bobVol.userId}`, {
+      method: 'PUT', headers: json(admin), body: JSON.stringify({ name: `${RUN} SHOULD-NOT-APPLY` }),
+    })
+    expect(res.status).toBe(404)
+    // The volunteer's user must be untouched.
+    const after = await $fetch<{ name: string }>(`/api/get/users/byId/${bobVol.userId}`, {
+      headers: { cookie: admin },
+    })
+    expect(after.name).toBe(before.name)
+  })
+
   it('R-045 (#89): a partial client update does not wipe email/phone', async () => {
     const admin = await loginAs(ADMIN)
     const email = `${RUN}-89@example.com`

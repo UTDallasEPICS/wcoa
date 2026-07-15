@@ -92,6 +92,7 @@ is not documentation that can rot — it is enforced.
 | R-082 | `delete/admins` only archives users whose role is ADMIN (404 otherwise) | `delete/admins/[id].ts` | auto | `known-bugs.test.ts` |
 | R-083 | An admin cannot delete their own account, and the last remaining admin cannot be deleted (lockout guard) | `delete/admins/[id].ts` | auto | `known-bugs.test.ts` |
 | R-084 | Admin soft-delete releases email/phone, revokes sessions; double-delete 404s | `delete/admins/[id].ts` | auto | `admin-delete.test.ts`, `soft-deletes.test.ts` |
+| R-085 | `put/admins` only edits users whose role is ADMIN (404 otherwise), mirroring delete/admins (#105) | `put/admins/[id].ts` | auto | `known-bugs.test.ts` |
 
 ## 6. Rides — CRUD & lifecycle
 

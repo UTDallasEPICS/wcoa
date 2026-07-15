@@ -30,8 +30,14 @@ export default defineEventHandler(async (event) => {
   // prisma.user.update and surfaced the raw P2025 as a 500. 404 like the sibling
   // update endpoints (put/clients, put/volunteers). Soft delete (issue #27): an
   // archived user is treated as gone.
+  //
+  // Issue #105: this endpoint edits ADMINs only — the update-side analogue of
+  // #88 on delete/admins. Without the role filter it would edit ANY user (e.g. a
+  // CLIENT's or VOLUNTEER's user row) by id, bypassing put/clients / put/volunteers
+  // and their own validation. Scope the lookup to role: 'ADMIN' so a non-admin id
+  // resolves to "not found" (404), mirroring delete/admins/[id].ts.
   const existing = await prisma.user.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, role: 'ADMIN', deletedAt: null },
   })
   if (!existing) {
     throw createError({
@@ -51,7 +57,10 @@ export default defineEventHandler(async (event) => {
   // user's email/phone) is a clean 409, not a 500 (issue #91).
   try {
     return await prisma.user.update({
-      where: { id },
+      // role: 'ADMIN' mirrors the findFirst guard above (issue #105,
+      // defense-in-depth) so this write can never edit a non-admin, matching
+      // delete/admins/[id].ts.
+      where: { id, role: 'ADMIN', deletedAt: null },
       data,
     })
   } catch (err) {
