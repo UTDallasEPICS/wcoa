@@ -122,7 +122,7 @@ export default defineEventHandler(async (event) => {
         <p>You have successfully unsigned from the following ride:</p>
         <p><strong>From:</strong> ${ride.pickupDisplay}</p>
         <p><strong>To:</strong> ${ride.dropoffDisplay}</p>
-        <p><strong>Time:</strong> ${new Date(ride.scheduledTime).toLocaleString()}</p>
+        <p><strong>Time:</strong> ${formatNotificationDateTime(new Date(ride.scheduledTime))}</p>
       `
     ))
   }
@@ -138,7 +138,7 @@ export default defineEventHandler(async (event) => {
         <p><strong>Ride Details:</strong></p>
         <p><strong>From:</strong> ${ride.pickupDisplay}</p>
         <p><strong>To:</strong> ${ride.dropoffDisplay}</p>
-        <p><strong>Time:</strong> ${new Date(ride.scheduledTime).toLocaleString()}</p>
+        <p><strong>Time:</strong> ${formatNotificationDateTime(new Date(ride.scheduledTime))}</p>
       `
     ))
   })
