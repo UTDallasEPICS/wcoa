@@ -134,7 +134,7 @@ is not documentation that can rot — it is enforced.
 | R-152 | Rides list: include/exclude status filter chips compose server-side; bogus status values are ignored (whitelist incl. CANCELLED) | `get/rides/index.ts` | auto | `ride-filters.test.ts` |
 | R-153 | Rides list: date range filter, end date inclusive of the whole day | `get/rides/index.ts` | auto | `ride-filters.test.ts` |
 | R-154 | Rides list: free-text search across id, displays, client name, volunteer name | `get/rides/index.ts` | auto | `ride-filters.test.ts` |
-| R-155 | `get/users` is bounded/paginated like every other list | `get/users/index.ts` | pin [#97](https://github.com/UTDallasEPICS/wcoa/issues/97) | `known-bugs.test.ts` |
+| R-155 | `get/users` is bounded/paginated like every other list | `get/users/index.ts` | auto | `known-bugs.test.ts` |
 | R-156 | `get/audit` is capped (≤100) with action/userId filters | `get/audit/index.ts` | auto | `audit-log.test.ts` |
 | R-157 | `get/addresses` is bounded and returns `{id, label, address}` for the typeahead; `/options` endpoints are bounded dropdown feeds | `get/addresses`, `*/options` | auto | `address-search.test.ts`, `pagination.test.ts` |
 | R-158 | `users/byEmail` & `users/byId` of an unknown user → 404, not 204 null | `get/users/*` | auto | `known-bugs.test.ts` |
