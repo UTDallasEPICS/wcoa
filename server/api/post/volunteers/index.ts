@@ -24,7 +24,8 @@ export default defineEventHandler(async (event) => {
   // We use upsert to create if not exists, or update name/phone if exists
   // Ideally, we might check if they are already a volunteer
   let user = await prisma.user.findUnique({
-    where: { email: body.email }
+    where: { email: body.email },
+    include: { client: true }
   })
 
   if (!user) {
@@ -37,16 +38,27 @@ export default defineEventHandler(async (event) => {
       }
     })
   } else {
+    // Singular-role guard (issue #92): reject creating a volunteer profile on an
+    // email that already belongs to a client account, instead of silently
+    // upgrading CLIENT -> VOLUNTEER while the client profile + rides remain
+    // stranded under a now-VOLUNTEER user. An existing VOLUNTEER falls through to
+    // the "already a volunteer" 400 below.
+    const hasActiveClient = !!user.client && user.client.deletedAt === null
+    if (user.role === 'CLIENT' || hasActiveClient) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'That email belongs to a client account',
+      })
+    }
     // Update name and (presence-aware, issue #89) phone; only touch phone when
-    // the caller actually sent it, so promoting an existing user to volunteer
-    // without a phone field doesn't wipe their stored number. Upgrade CLIENT to
-    // VOLUNTEER but never downgrade an ADMIN.
+    // the caller actually sent it, so re-posting an existing user without a phone
+    // field doesn't wipe their stored number. Role is left untouched (never
+    // downgrade an ADMIN; CLIENT is already rejected above).
     await prisma.user.update({
       where: { id: user.id },
       data: {
         name: body.name,
         ...(body.phone !== undefined ? { phone: emptyToNull(body.phone) } : {}),
-        role: user.role === 'CLIENT' ? 'VOLUNTEER' : user.role
       }
     })
   }
