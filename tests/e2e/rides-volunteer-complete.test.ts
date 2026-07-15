@@ -75,7 +75,15 @@ afterEach(async () => {
   if (!touchedRideIds.size) return
   const cookie = await loginAs(ADMIN)
   for (const id of touchedRideIds) {
-    await put(cookie, id, { volunteerId: '', status: 'CREATED' })
+    // Best-effort reset via non-throwing appFetch: since #95 a COMPLETED ride is
+    // terminal and can't be reset to CREATED (409). A ride left COMPLETED is
+    // harmless — the seed DB is reset per-file and each test picks its own
+    // untouched CREATED ride.
+    await appFetch(`/api/put/rides/${id}`, {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ volunteerId: '', status: 'CREATED' }),
+    })
   }
   touchedRideIds.clear()
 })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { $fetch } from '@nuxt/test-utils/e2e'
+import { $fetch, fetch as appFetch } from '@nuxt/test-utils/e2e'
 import { bootShared } from '../utils/harness'
 import { loginAs } from '../utils/auth'
 
@@ -58,9 +58,15 @@ afterEach(async () => {
   if (!touchedRideIds.size) return
   const cookie = await loginAs('reachtusharwani@gmail.com')
   for (const id of touchedRideIds) {
-    // Directly reset to CREATED/unassigned (bypass the auto-CREATED behavior by
-    // sending an explicit status alongside the cleared volunteer).
-    await put(cookie, id, { volunteerId: '', status: 'CREATED' })
+    // Best-effort reset to CREATED/unassigned via non-throwing appFetch. Since
+    // #95 a COMPLETED ride is terminal, so this reset is a no-op (409) for a
+    // ride a test left COMPLETED — harmless, since the seed DB is reset per-file
+    // and every test picks its own untouched CREATED ride.
+    await appFetch(`/api/put/rides/${id}`, {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ volunteerId: '', status: 'CREATED' }),
+    })
   }
   touchedRideIds.clear()
 })

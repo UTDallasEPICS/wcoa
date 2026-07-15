@@ -14,12 +14,16 @@ async function adminCookie() {
 }
 
 async function firstRideId(cookie: string): Promise<string> {
-  const { items: rides } = await $fetch<{ items: Array<{ id: string }> }>(
+  const { items: rides } = await $fetch<{ items: Array<{ id: string; status: string }> }>(
     '/api/get/rides?pageSize=100',
     { headers: { cookie } }
   )
-  expect(rides.length).toBeGreaterThan(0)
-  return rides[0]!.id
+  // Pick a non-terminal ride: since #95, a COMPLETED/CANCELLED ride rejects any
+  // status transition (409), so the "valid status update" case below needs a
+  // ride whose status can still legitimately change.
+  const ride = rides.find((r) => r.status === 'CREATED' || r.status === 'ASSIGNED')
+  expect(ride, 'seed should have a non-terminal ride').toBeTruthy()
+  return ride!.id
 }
 
 describe('PUT /api/put/rides/[id] input validation (#31)', () => {

@@ -56,6 +56,28 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Issue #95: COMPLETED and CANCELLED are terminal states. Reject an explicit
+  // status change *out* of one of them. e.g. sending {status:'CREATED'} to a
+  // COMPLETED ride would re-enter it into the signup pool while keeping its
+  // stale totalRideTime, silently corrupting completion metrics; CANCELLED→
+  // ASSIGNED is likewise wrong. This fires only when the caller explicitly
+  // sends a *different* status, so same-status no-op edits (e.g. editing a
+  // COMPLETED ride's notes with status:'COMPLETED') stay allowed, and the
+  // implicit ASSIGNED→CREATED unassign auto-reset below — which runs only when
+  // body.status is undefined — is untouched. Forward transitions (CREATED↔
+  // ASSIGNED, ASSIGNED→COMPLETED, CREATED/ASSIGNED→CANCELLED) all still work.
+  const TERMINAL = ['COMPLETED', 'CANCELLED']
+  if (
+    body.status !== undefined &&
+    body.status !== existingRide.status &&
+    TERMINAL.includes(existingRide.status)
+  ) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `Cannot change the status of a ${existingRide.status.toLowerCase()} ride`,
+    })
+  }
+
   // Issue #10: a ride can only be marked COMPLETED with a valid duration.
   // The Complete modal (app/pages/rides/[id].vue) already enforces
   // totalRideTime >= 0.1 via zod, but a direct API call could complete a ride

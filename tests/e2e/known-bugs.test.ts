@@ -224,18 +224,20 @@ describe('known-bug pins (issues #87–#97) — R-IDs from REQUIREMENTS.md', () 
     expect(byId.status).toBe(404)
   })
 
-  it.fails('R-108 (#95): a COMPLETED ride cannot be reset to CREATED', async () => {
+  it('R-108 (#95): a COMPLETED ride cannot be reset to CREATED', async () => {
     const admin = await loginAs(ADMIN)
     const client = await createClient(admin, `${RUN} B95`, `${RUN}-95@example.com`)
     const ride = await createRide(admin, client.id)
     await $fetch(`/api/put/rides/${ride.id}`, {
       method: 'PUT', headers: json(admin), body: { status: 'COMPLETED', totalRideTime: 1 },
     })
-    // Currently: 200 — the ride re-enters the pool keeping its stale totalRideTime.
+    // Fixed (#95): a COMPLETED ride is terminal, so un-completing it back to
+    // CREATED is rejected (409) instead of silently re-entering the pool with a
+    // stale totalRideTime.
     const res = await appFetch(`/api/put/rides/${ride.id}`, {
       method: 'PUT', headers: json(admin), body: JSON.stringify({ status: 'CREATED' }),
     })
-    expect(res.status).toBe(400)
+    expect([400, 409]).toContain(res.status)
   })
 
   it.fails('R-155 (#97): get/users returns a bounded pagination envelope', async () => {

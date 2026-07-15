@@ -105,7 +105,7 @@ is not documentation that can rot — it is enforced.
 | R-105 | Ride update accepts ONLY whitelisted fields; unknown keys 400 via `.strict()` (mass-assignment guard, #31) | `put/rides/[id].ts` | auto | `ride-input-validation.test.ts` |
 | R-106 | Unassigning a volunteer (volunteerId → null/"") auto-resets status to CREATED — but only when the ride was ASSIGNED and no explicit status was sent (#7) | `put/rides/[id].ts` | auto | `unassign-status.test.ts` |
 | R-107 | Completing a ride requires totalRideTime ≥ 0.1 (on the request or already stored) (#10) | `put/rides/[id].ts` | auto | `complete-requires-ridetime.test.ts` |
-| R-108 | Ride status transitions are guarded server-side (no COMPLETED→CREATED un-complete with stale totalRideTime) | `put/rides/[id].ts` | pin [#95](https://github.com/UTDallasEPICS/wcoa/issues/95) | `known-bugs.test.ts` |
+| R-108 | Ride status transitions are guarded server-side (no COMPLETED→CREATED un-complete with stale totalRideTime) | `put/rides/[id].ts` | auto | `known-bugs.test.ts` |
 | R-109 | Cancelling notifies the previously-assigned volunteer via the RIDE_CANCELLED template (#5) | `put/rides/[id].ts` | auto | `ride-cancel.test.ts` |
 | R-110 | Completing notifies the volunteer (RIDE_COMPLETED) and emails admins | `put/rides/[id].ts` | auto | `requirements-flows.test.ts` |
 | R-111 | Update/complete/signup against an archived ride → 404 (#27) | `put/rides`, signup | auto | `soft-deletes.test.ts` |
