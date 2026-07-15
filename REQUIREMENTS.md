@@ -208,7 +208,7 @@ is not documentation that can rot — it is enforced.
 | R-301 | Settings (volunteer): profile card, status selector, per-type notification toggles, reminder editor — all persisted via bySession endpoints | `app/pages/settings.vue` | auto | browser: `volunteer-flows.spec.ts` |
 | R-302 | Admin notification page: 5 template cards with Edit/Disable reflecting `enabled` | `app/pages/admin/notifications.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-303 | Admin audit page: bounded table, action/user filters | `app/pages/admin/audit.vue` | auto | browser: `admin-flows.spec.ts` |
-| R-304 | Pages hydrate without mismatches (SSR output == client render) | layout | manual [#98](https://github.com/UTDallasEPICS/wcoa/issues/98) | browser: `admin-flows.spec.ts` non-gating diagnostic (mismatch reproduces intermittently; observed in audit) |
+| R-304 | Pages hydrate without mismatches (SSR output == client render): SSR-rendered dates are timezone-stable so server (UTC) and browser (local TZ) agree | `app/utils/datetime.ts`, rides/index.vue, rides/[id].vue, admin/audit.vue | auto [#98](https://github.com/UTDallasEPICS/wcoa/issues/98) | `hydration-datetime.test.ts` (server-side determinism) + browser: `admin-flows.spec.ts` (`/rides` hydrates clean) |
 | R-305 | Success/error toasts on every mutating UI action | all pages | auto | browser specs (asserted on key flows) |
 
 ## Known non-requirements / accepted behavior

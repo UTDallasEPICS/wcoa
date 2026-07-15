@@ -121,13 +121,20 @@ test('R-303: audit page renders the trail of this suite\'s own actions', async (
   await expect(page.getByText('RIDE_CANCELLED').first()).toBeVisible()
 })
 
-// R-304 / issue #98: hydration-mismatch diagnostic. The mismatch was observed
-// in the audit but reproduces intermittently (it did not surface on this
-// separate prod build), so this is a NON-GATING diagnostic that records the
-// count rather than a flaky negative pin. R-304 is tracked as `manual` in
-// REQUIREMENTS.md against #98; tighten this to a hard assertion once the fix
-// makes the page reliably clean.
-test('R-304 (#98): hydration-mismatch diagnostic (non-gating)', async ({ page }) => {
+// R-304 / issue #98: /rides must hydrate without mismatches. Root cause was
+// timezone-dependent date formatting: the "Date" column used
+// `toLocaleString('en-US', { … })` with NO fixed timeZone, so the server (UTC
+// in prod) and the browser (viewer's local TZ) rendered the same instant into
+// different strings. The fix pins locale + timezone (app/utils/datetime.ts), so
+// the page is now reliably clean — this is a hard assertion rather than the old
+// non-gating diagnostic.
+//
+// Caveat: this Playwright suite runs the Nuxt server and the browser on the
+// SAME machine (same TZ), so it does not, on its own, exercise the UTC-vs-local
+// divergence that produced the audit mismatch; the server-side determinism is
+// pinned by tests/e2e/hydration-datetime.test.ts. This assertion still guards
+// against any OTHER hydration mismatch reappearing on the shell/route.
+test('R-304 (#98): /rides hydrates without mismatches', async ({ page }) => {
   const errors: string[] = []
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text())
@@ -135,6 +142,5 @@ test('R-304 (#98): hydration-mismatch diagnostic (non-gating)', async ({ page })
   await page.goto('/rides')
   await page.waitForLoadState('networkidle')
   const hydration = errors.filter((e) => /hydration/i.test(e))
-  if (hydration.length) console.warn(`[R-304/#98] hydration mismatches on /rides: ${hydration.length}`)
-  expect(true).toBe(true)
+  expect(hydration).toEqual([])
 })

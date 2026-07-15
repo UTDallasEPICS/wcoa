@@ -31,7 +31,9 @@ untagged requirement turns CI red** — that's what keeps the catalog honest ins
 The 2026-07-14 audit found 12 open defects (issues #87–#98). Each has a pin that asserts the
 **correct** behavior, wrapped so today's wrong behavior is "expected":
 - API pins use `it.fails(...)` in `known-bugs.test.ts`.
-- UI pins use `test.fail()` in the browser specs (R-135/#87, and the R-304/#98 diagnostic).
+- UI pins use `test.fail()` in the browser specs (R-135/#87). The R-304/#98 hydration check is now a
+  hard assertion (`/rides` hydrates clean) — its server-side determinism is guarded by
+  `tests/e2e/hydration-datetime.test.ts`.
 
 **When you fix a bug, its pin starts failing** (because the assertion now passes). That is the signal to:
 1. remove the `.fails` / `test.fail()`, and
