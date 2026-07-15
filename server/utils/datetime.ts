@@ -33,6 +33,15 @@ const timeFormatter = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 })
 
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
 /** e.g. "February 16, 2026" */
 export function formatNotificationDate(date: Date): string {
   return dateFormatter.format(date)
@@ -41,4 +50,16 @@ export function formatNotificationDate(date: Date): string {
 /** e.g. "9:00 AM" */
 export function formatNotificationTime(date: Date): string {
   return timeFormatter.format(date)
+}
+
+/**
+ * Combined calendar date + clock time, e.g. "February 16, 2026 at 9:00 AM"
+ * (issue #113). Server-side email/reminder bodies previously used a bare
+ * `new Date(x).toLocaleString()`, which renders in the host process timezone —
+ * UTC in the prod container — so volunteers/admins saw UTC times. Pinning to
+ * `America/Chicago` (matching the other formatters above) keeps the rendered
+ * time in the org timezone regardless of the host environment.
+ */
+export function formatNotificationDateTime(date: Date): string {
+  return dateTimeFormatter.format(date)
 }

@@ -163,6 +163,7 @@ is not documentation that can rot — it is enforced.
 | R-194 | Broadcasts go only to AVAILABLE, non-deleted volunteers; sends run parallel via allSettled (one failure never aborts the rest) | `broadcastNotification` | auto | `ride-broadcast-nonblocking.test.ts` |
 | R-195 | `sendEmail` returns boolean and never throws; under TEST_HOOKS it's a strict no-op seam; in prod it always really sends (#25) | `server/utils/email.ts` | auto | `otp-send-failure.test.ts` + code inspection |
 | R-196 | Notification dates render as real calendar dates/times, not bare weekdays (#9) | `server/utils/datetime.ts` | auto | `notification-datetime.test.ts` |
+| R-197 | Server-rendered notification/email/reminder times use the pinned org timezone (`America/Chicago`) via `formatNotificationDateTime`, not the host TZ (UTC in prod) — signup/unsignup email bodies + the RIDE_REMINDER `time` field (#113) | `server/utils/datetime.ts`, `signup.ts`, `unsignup.ts`, `scheduler.ts` | auto | `notification-timezone.test.ts` |
 
 ## 11. Reminder cron
 

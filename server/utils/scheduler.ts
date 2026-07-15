@@ -2,6 +2,7 @@ import { Prisma } from '../../prisma/generated/client'
 import { prisma } from './prisma'
 import { sendNotification } from './notification'
 import { maybeFault } from './testHooks'
+import { formatNotificationDateTime } from './datetime'
 
 export async function processReminders() {
   const now = new Date()
@@ -97,7 +98,7 @@ export async function processReminders() {
               client: ride.client.user.name,
               pickup: ride.pickupDisplay,
               dropoff: ride.dropoffDisplay,
-              time: scheduledTime.toLocaleString(),
+              time: formatNotificationDateTime(scheduledTime),
               notes: ride.notes || 'None',
               link: `${process.env.APP_URL || 'http://localhost:3000'}/rides/${ride.id}`,
             })
