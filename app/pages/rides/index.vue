@@ -536,15 +536,13 @@
             :class="{ 'text-primary font-medium': startDate || endDate }"
           />
           <template #content>
-            <div class="w-72 space-y-3 p-3">
-              <div class="flex items-end gap-2">
-                <UFormField label="From" class="flex-1">
-                  <UInput v-model="startDate" type="date" class="w-full" />
-                </UFormField>
-                <UFormField label="To" class="flex-1">
-                  <UInput v-model="endDate" type="date" class="w-full" />
-                </UFormField>
-              </div>
+            <div class="w-72 max-w-[calc(100vw-2rem)] space-y-3 p-3">
+              <UFormField label="From">
+                <UInput v-model="startDate" type="date" class="w-full" />
+              </UFormField>
+              <UFormField label="To">
+                <UInput v-model="endDate" type="date" class="w-full" />
+              </UFormField>
               <div class="flex justify-end">
                 <UButton
                   label="Clear"
