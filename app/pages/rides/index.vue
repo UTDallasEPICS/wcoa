@@ -354,12 +354,12 @@
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
         <!-- Toolbar: search keeps the row width; filter controls group and wrap
              beside it on wide screens instead of stacking into a tall column. -->
-        <div class="mb-3 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center">
+        <div class="mb-3 flex shrink-0 flex-col gap-3">
           <UInput
             v-model="search"
             icon="i-lucide-search"
             placeholder="Search rides..."
-            class="w-full lg:max-w-xs lg:flex-1"
+            class="w-full"
           />
           <div class="flex flex-wrap items-center gap-2">
             <!-- Status filter: toggle which statuses to show. Selecting none shows
@@ -554,15 +554,11 @@
             class="w-28"
           />
           <UPagination
-            v-if="total > Number(pageSize)"
             v-model:page="page"
             :total="total"
             :items-per-page="Number(pageSize)"
             size="sm"
           />
-          <span v-else class="text-xs text-gray-500"
-            >{{ total }} {{ total === 1 ? 'ride' : 'rides' }}</span
-          >
         </div>
       </div>
 
