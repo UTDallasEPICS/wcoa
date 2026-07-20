@@ -31,8 +31,12 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
 RUN npm i -g pnpm
 
-# Install Prisma without running any scripts to avoid running nuxt scripts
-RUN pnpm i --dev --ignore-scripts --frozen-lockfile
+# Install deps without running any scripts to avoid running nuxt scripts.
+# NOTE: no `--dev` here. The deploy stage needs `dotenv` too, which is a prod
+# dependency that prisma.config.ts imports (`import 'dotenv/config'`). Passing
+# `--dev` installs devDependencies ONLY, dropping dotenv, so the `prisma
+# generate` below fails with "Cannot find module 'dotenv/config'".
+RUN pnpm i --ignore-scripts --frozen-lockfile
 # Run the build scripts needed for prisma to work (for migrations and seeding)
 RUN pnpm rebuild esbuild better-sqlite3 @prisma/engines prisma
 RUN pnpm prisma generate
