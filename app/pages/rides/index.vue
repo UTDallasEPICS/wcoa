@@ -1,7 +1,6 @@
 <script setup lang="ts">
   import { h, resolveComponent } from 'vue'
   import type { TableColumn, TableRow } from '@nuxt/ui'
-  import * as z from 'zod'
   import { authClient } from '../../utils/auth-client'
   import {
     RIDE_STATUS_OPTIONS,
@@ -126,7 +125,7 @@
     legacySort.value = null
   })
 
-  const isCreateModalOpen = ref(false)
+  const isCreateOpen = ref(false)
 
   function toggleStatus(value: string) {
     selectedStatuses.value = selectedStatuses.value.includes(value)
@@ -187,130 +186,6 @@
   function clearDateRange() {
     startDate.value = ''
     endDate.value = ''
-  }
-
-  // --- Schema ---
-  const addressSchema = z.object({
-    street: z.string().min(1, 'Street is required'),
-    city: z.string().min(1, 'City is required'),
-    state: z.string().min(1, 'State is required'),
-    zip: z.string().min(1, 'Zip is required'),
-  })
-
-  const schema = z.object({
-    clientId: z.string().min(1, 'Client is required'),
-    pickup: addressSchema,
-    dropoff: addressSchema,
-    scheduledTime: z.string().min(1, 'Date is required'),
-    pickupTime: z.string().optional(),
-    notes: z.string().optional(),
-    volunteerId: z.any().optional(),
-  })
-
-  // --- State ---
-  const state = reactive(blankRideForm())
-
-  // --- Autocomplete Logic ---
-  // Query the backend with `?search=` (debounced) instead of fetching a fixed
-  // list of 20 once on mount and filtering it client-side. This lets any address
-  // in the table surface, not just the first 20 alphabetically (issue #19). The
-  // query-building and debounce logic live in a pure, unit-tested helper.
-  const pickupSearch = ref('')
-  const dropoffSearch = ref('')
-
-  const pickupOptions = ref<any[]>([])
-  const dropoffOptions = ref<any[]>([])
-
-  async function fetchAddressOptions(search: string, target: Ref<any[]>) {
-    const query = buildAddressQuery(search)
-    if (!query) {
-      target.value = []
-      return
-    }
-    try {
-      const results = await $fetch<any[]>('/api/get/addresses', { query })
-      // Ignore stale responses: only apply if the input still matches the term
-      // we searched for (avoids out-of-order results overwriting newer ones).
-      if ((search ?? '').trim() === query.search) {
-        target.value = (results ?? []).slice(0, 5)
-      }
-    } catch (err) {
-      console.error('Failed to fetch address suggestions', err)
-      target.value = []
-    }
-  }
-
-  const debouncedPickupFetch = debounce(
-    (search: string) => fetchAddressOptions(search, pickupOptions),
-    250
-  )
-  const debouncedDropoffFetch = debounce(
-    (search: string) => fetchAddressOptions(search, dropoffOptions),
-    250
-  )
-
-  watch(pickupSearch, (term) => {
-    if (!buildAddressQuery(term)) {
-      // Clear immediately (and cancel any pending fetch) when the box empties.
-      debouncedPickupFetch.cancel()
-      pickupOptions.value = []
-      return
-    }
-    debouncedPickupFetch(term)
-  })
-
-  watch(dropoffSearch, (term) => {
-    if (!buildAddressQuery(term)) {
-      debouncedDropoffFetch.cancel()
-      dropoffOptions.value = []
-      return
-    }
-    debouncedDropoffFetch(term)
-  })
-
-  const volunteerOptions = computed(() => {
-    if (!volunteers.value) return []
-    const list = volunteers.value.map((v: any) => ({
-      label: v.name || 'Unknown Volunteer',
-      value: v.id,
-    }))
-    return [{ label: 'Unassigned', value: '' }, ...list]
-  })
-
-  watch(
-    () => state.clientId,
-    (newId) => {
-      if (!newId || !clients.value) return
-      const client = clients.value.find((c: any) => c.id === newId)
-      if (client?.homeAddress) {
-        Object.assign(state.pickup, {
-          street: client.homeAddress.street,
-          city: client.homeAddress.city,
-          state: client.homeAddress.state,
-          zip: client.homeAddress.zip,
-        })
-      }
-    }
-  )
-
-  function onPickupSelect(opt: any) {
-    Object.assign(state.pickup, {
-      street: opt.address.street,
-      city: opt.address.city,
-      state: opt.address.state,
-      zip: opt.address.zip,
-    })
-    pickupSearch.value = ''
-  }
-
-  function onDropoffSelect(opt: any) {
-    Object.assign(state.dropoff, {
-      street: opt.address.street,
-      city: opt.address.city,
-      state: opt.address.state,
-      zip: opt.address.zip,
-    })
-    dropoffSearch.value = ''
   }
 
   // Filtering, searching, date-range and sorting are all applied server-side
@@ -445,48 +320,11 @@
     await navigateTo(`/rides/${row.original.id}`)
   }
 
-  async function onSubmit(event: any) {
-    try {
-      // Convert local datetime-local string to ISO string (UTC)
-      const scheduledTimeISO = new Date(event.data.scheduledTime).toISOString()
-      const pickupTimeISO = event.data.pickupTime
-        ? new Date(event.data.pickupTime).toISOString()
-        : undefined
-
-      // Handle volunteerId being an object or string
-      const vId =
-        typeof event.data.volunteerId === 'object'
-          ? event.data.volunteerId.value
-          : event.data.volunteerId
-
-      await $fetch('/api/post/rides', {
-        method: 'POST',
-        body: {
-          ...event.data,
-          volunteerId: vId,
-          scheduledTime: scheduledTimeISO,
-          pickupTime: pickupTimeISO,
-        },
-      })
-      isCreateModalOpen.value = false
-      await refreshRides()
-      // Reset state back to a blank form. Assign into the nested pickup/dropoff
-      // objects so the reactive references are preserved and the address fields
-      // actually clear (issue #11 — the old reset used non-existent
-      // `pickupDisplay`/`dropoffDisplay` keys and never cleared the addresses).
-      const blank = blankRideForm()
-      Object.assign(state.pickup, blank.pickup)
-      Object.assign(state.dropoff, blank.dropoff)
-      state.clientId = blank.clientId
-      state.scheduledTime = blank.scheduledTime
-      state.pickupTime = blank.pickupTime
-      state.notes = blank.notes
-      state.volunteerId = blank.volunteerId
-      pickupSearch.value = ''
-      dropoffSearch.value = ''
-    } catch (err) {
-      console.error('Failed to create ride', err)
-    }
+  // The create wizard (RideCreatePanel) owns the form + POST; here we just close
+  // the pane and refresh the list so the new ride shows up.
+  async function onCreated() {
+    isCreateOpen.value = false
+    await refreshRides()
   }
 </script>
 
@@ -504,339 +342,216 @@
         label="Create Ride"
         icon="i-lucide-plus"
         color="primary"
-        @click="isCreateModalOpen = true"
+        @click="isCreateOpen = true"
       />
     </div>
 
-    <!-- Toolbar: search keeps the full row width; the filter controls group and
-         wrap together beside it on wide screens instead of each stacking into a
-         tall full-width column. -->
-    <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
-      <UInput
-        v-model="search"
-        icon="i-lucide-search"
-        placeholder="Search rides..."
-        class="w-full lg:max-w-xs lg:flex-1"
-      />
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- Status filter: toggle which statuses to show. Selecting none shows
+    <!-- Rides list, with the create wizard as a side pane on desktop / full-screen
+         overlay on mobile. When the pane is open, the list shrinks to make room. -->
+    <div class="lg:flex lg:items-start lg:gap-6">
+      <div :class="isCreateOpen ? 'min-w-0 lg:flex-1' : 'w-full'">
+        <!-- Toolbar: search keeps the full row width; the filter controls group
+             and wrap together beside it on wide screens instead of each stacking
+             into a tall full-width column. -->
+        <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <UInput
+            v-model="search"
+            icon="i-lucide-search"
+            placeholder="Search rides..."
+            class="w-full lg:max-w-xs lg:flex-1"
+          />
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Status filter: toggle which statuses to show. Selecting none shows
              all. The active chip takes its status' badge colour. -->
-        <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
-          <UButton
-            v-for="opt in RIDE_STATUS_OPTIONS"
-            :key="opt.value"
-            :label="opt.label"
-            size="sm"
-            :color="selectedStatuses.includes(opt.value) ? statusColor(opt.value) : 'neutral'"
-            :variant="selectedStatuses.includes(opt.value) ? 'subtle' : 'ghost'"
-            :aria-pressed="selectedStatuses.includes(opt.value)"
-            @click="toggleStatus(opt.value)"
-          />
-          <UButton
-            v-if="!isAdmin"
-            label="Assigned to me"
-            icon="i-lucide-user-check"
-            size="sm"
-            :color="assignedToMe ? 'primary' : 'neutral'"
-            :variant="assignedToMe ? 'subtle' : 'ghost'"
-            :aria-pressed="assignedToMe"
-            @click="assignedToMe = !assignedToMe"
-          />
-        </div>
+            <div
+              class="flex flex-wrap items-center gap-1.5"
+              role="group"
+              aria-label="Filter by status"
+            >
+              <UButton
+                v-for="opt in RIDE_STATUS_OPTIONS"
+                :key="opt.value"
+                :label="opt.label"
+                size="sm"
+                :color="selectedStatuses.includes(opt.value) ? statusColor(opt.value) : 'neutral'"
+                :variant="selectedStatuses.includes(opt.value) ? 'subtle' : 'ghost'"
+                :aria-pressed="selectedStatuses.includes(opt.value)"
+                @click="toggleStatus(opt.value)"
+              />
+              <UButton
+                v-if="!isAdmin"
+                label="Assigned to me"
+                icon="i-lucide-user-check"
+                size="sm"
+                :color="assignedToMe ? 'primary' : 'neutral'"
+                :variant="assignedToMe ? 'subtle' : 'ghost'"
+                :aria-pressed="assignedToMe"
+                @click="assignedToMe = !assignedToMe"
+              />
+            </div>
 
-        <USelect
-          v-model="sort"
-          size="sm"
-          :items="[
-            { label: 'Oldest First', value: 'asc' },
-            { label: 'Newest First', value: 'desc' },
-          ]"
-          class="w-full sm:w-40"
-        />
+            <USelect
+              v-model="sort"
+              size="sm"
+              :items="[
+                { label: 'Oldest First', value: 'asc' },
+                { label: 'Newest First', value: 'desc' },
+              ]"
+              class="w-full sm:w-40"
+            />
 
-        <!-- Date range: one control reading "All dates" when unset; opens the
+            <!-- Date range: one control reading "All dates" when unset; opens the
              From/To pickers in a popover. This filter is transient (per-visit),
              not persisted like status/sort. -->
-        <UPopover>
-          <UButton
-            icon="i-lucide-calendar"
-            :label="dateRangeLabel"
-            size="sm"
-            color="neutral"
-            variant="outline"
-            :class="{ 'text-primary font-medium': startDate || endDate }"
-          />
-          <template #content>
-            <div class="w-72 max-w-[calc(100vw-2rem)] space-y-3 p-3">
-              <UFormField label="From">
-                <UInput v-model="startDate" type="date" class="w-full" />
-              </UFormField>
-              <UFormField label="To">
-                <UInput v-model="endDate" type="date" class="w-full" />
-              </UFormField>
-              <div class="flex justify-end">
-                <UButton
-                  label="Clear"
-                  size="sm"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="!startDate && !endDate"
-                  @click="clearDateRange"
-                />
-              </div>
+            <UPopover>
+              <UButton
+                icon="i-lucide-calendar"
+                :label="dateRangeLabel"
+                size="sm"
+                color="neutral"
+                variant="outline"
+                :class="{ 'text-primary font-medium': startDate || endDate }"
+              />
+              <template #content>
+                <div class="w-72 max-w-[calc(100vw-2rem)] space-y-3 p-3">
+                  <UFormField label="From">
+                    <UInput v-model="startDate" type="date" class="w-full" />
+                  </UFormField>
+                  <UFormField label="To">
+                    <UInput v-model="endDate" type="date" class="w-full" />
+                  </UFormField>
+                  <div class="flex justify-end">
+                    <UButton
+                      label="Clear"
+                      size="sm"
+                      color="neutral"
+                      variant="ghost"
+                      :disabled="!startDate && !endDate"
+                      @click="clearDateRange"
+                    />
+                  </div>
+                </div>
+              </template>
+            </UPopover>
+          </div>
+        </div>
+
+        <!-- Desktop (lg+): the full table. Below lg it would overflow sideways, so
+         it's hidden in favour of the ride cards below. -->
+        <UTable
+          :data="rides"
+          :columns="columns"
+          :loading="status === 'pending'"
+          class="hidden w-full cursor-pointer lg:block"
+          @select="onSelect"
+        >
+          <template #empty-state>
+            <div class="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+              <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+              <p class="font-medium">No rides found</p>
+              <p class="text-sm">Try adjusting your search or filters</p>
             </div>
           </template>
-        </UPopover>
-      </div>
-    </div>
+        </UTable>
 
-    <!-- Desktop (lg+): the full table. Below lg it would overflow sideways, so
-         it's hidden in favour of the ride cards below. -->
-    <UTable
-      :data="rides"
-      :columns="columns"
-      :loading="status === 'pending'"
-      class="hidden w-full cursor-pointer lg:block"
-      @select="onSelect"
-    >
-      <template #empty-state>
-        <div class="flex flex-col items-center justify-center py-12 text-center text-gray-500">
-          <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
-          <p class="font-medium">No rides found</p>
-          <p class="text-sm">Try adjusting your search or filters</p>
-        </div>
-      </template>
-    </UTable>
-
-    <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
+        <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
          same navigation target — only the presentation differs. -->
-    <div class="lg:hidden">
-      <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
-      </div>
-
-      <div
-        v-else-if="rides.length === 0"
-        class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-16 text-center text-gray-500 dark:border-gray-700"
-      >
-        <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
-        <p class="font-medium">No rides found</p>
-        <p class="text-sm">Try adjusting your search or filters</p>
-      </div>
-
-      <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <NuxtLink
-          v-for="ride in rides"
-          :key="ride.id"
-          :to="`/rides/${ride.id}`"
-          class="focus-visible:ring-primary block rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 focus:outline-none focus-visible:ring-2 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
-        >
-          <div class="mb-2 flex items-center justify-between gap-2">
-            <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
-              {{ ride.status }}
-            </UBadge>
-            <span class="text-xs font-medium text-gray-500">
-              {{
-                formatDateTime(ride.scheduledTime, {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              }}
-            </span>
-          </div>
-
-          <p class="font-semibold text-gray-900 dark:text-white">
-            {{ ride.client?.user?.name }}
-          </p>
-
-          <div class="mt-3 space-y-1.5">
-            <div class="flex items-start gap-2">
-              <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
-              <span class="text-sm text-gray-600 dark:text-gray-300">{{ ride.pickupDisplay }}</span>
-            </div>
-            <div class="flex items-start gap-2">
-              <UIcon name="i-lucide-flag" class="text-error mt-0.5 size-4 shrink-0" />
-              <span class="text-sm text-gray-600 dark:text-gray-300">{{
-                ride.dropoffDisplay
-              }}</span>
-            </div>
+        <div class="lg:hidden">
+          <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
           </div>
 
           <div
-            class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800"
+            v-else-if="rides.length === 0"
+            class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-16 text-center text-gray-500 dark:border-gray-700"
           >
-            <span
-              v-if="ride.volunteer?.user?.name"
-              class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
-            >
-              <span
-                class="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-              >
-                {{ initials(ride.volunteer.user.name) }}
-              </span>
-              {{ ride.volunteer.user.name }}
-            </span>
-            <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
-            <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
+            <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+            <p class="font-medium">No rides found</p>
+            <p class="text-sm">Try adjusting your search or filters</p>
           </div>
-        </NuxtLink>
+
+          <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <NuxtLink
+              v-for="ride in rides"
+              :key="ride.id"
+              :to="`/rides/${ride.id}`"
+              class="focus-visible:ring-primary block rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 focus:outline-none focus-visible:ring-2 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+            >
+              <div class="mb-2 flex items-center justify-between gap-2">
+                <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
+                  {{ ride.status }}
+                </UBadge>
+                <span class="text-xs font-medium text-gray-500">
+                  {{
+                    formatDateTime(ride.scheduledTime, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  }}
+                </span>
+              </div>
+
+              <p class="font-semibold text-gray-900 dark:text-white">
+                {{ ride.client?.user?.name }}
+              </p>
+
+              <div class="mt-3 space-y-1.5">
+                <div class="flex items-start gap-2">
+                  <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
+                  <span class="text-sm text-gray-600 dark:text-gray-300">{{
+                    ride.pickupDisplay
+                  }}</span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <UIcon name="i-lucide-flag" class="text-error mt-0.5 size-4 shrink-0" />
+                  <span class="text-sm text-gray-600 dark:text-gray-300">{{
+                    ride.dropoffDisplay
+                  }}</span>
+                </div>
+              </div>
+
+              <div
+                class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800"
+              >
+                <span
+                  v-if="ride.volunteer?.user?.name"
+                  class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+                >
+                  <span
+                    class="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                  >
+                    {{ initials(ride.volunteer.user.name) }}
+                  </span>
+                  {{ ride.volunteer.user.name }}
+                </span>
+                <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
+                <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
+              </div>
+            </NuxtLink>
+          </div>
+        </div>
+
+        <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
+          <UPagination v-model:page="page" :total="total" :items-per-page="PAGE_SIZE" />
+        </div>
+      </div>
+
+      <!-- Create pane: a side pane beside the list on desktop, a full-screen
+           overlay below lg. The RideCreatePanel wizard is the same either way. -->
+      <div
+        v-if="isCreateOpen"
+        class="max-lg:fixed max-lg:inset-0 max-lg:z-50 lg:sticky lg:top-6 lg:h-[calc(100vh-8rem)] lg:w-[400px] lg:flex-none lg:self-start"
+      >
+        <RideCreatePanel
+          :clients="clients"
+          :volunteers="volunteers"
+          @created="onCreated"
+          @close="isCreateOpen = false"
+        />
       </div>
     </div>
-
-    <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
-      <UPagination v-model:page="page" :total="total" :items-per-page="PAGE_SIZE" />
-    </div>
-
-    <!-- Create Ride Modal -->
-    <UModal v-model:open="isCreateModalOpen" title="Create New Ride">
-      <template #content>
-        <div class="max-h-[70vh] overflow-y-auto p-4">
-          <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
-            <UFormField label="Client" name="clientId">
-              <USelect
-                v-model="state.clientId"
-                :items="clients?.map((c) => ({ label: c.name, value: c.id })) || []"
-                placeholder="Select a client"
-                class="w-full"
-              />
-            </UFormField>
-
-            <div class="space-y-2 rounded-lg border p-4 dark:border-gray-700">
-              <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Pickup Address</h3>
-
-              <!-- Custom Autocomplete -->
-              <div class="relative mb-2">
-                <UInput
-                  v-model="pickupSearch"
-                  placeholder="Type to find existing address (e.g. Street)..."
-                  icon="i-lucide-search"
-                  autocomplete="off"
-                  class="w-full"
-                />
-                <div
-                  v-if="pickupOptions?.length > 0 && pickupSearch"
-                  class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                >
-                  <button
-                    v-for="opt in pickupOptions"
-                    :key="opt.id"
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                    @click="onPickupSelect(opt)"
-                  >
-                    {{ opt.label }}
-                  </button>
-                </div>
-              </div>
-
-              <UFormField label="Street" name="pickup.street">
-                <UInput v-model="state.pickup.street" placeholder="Street Address" class="w-full" />
-              </UFormField>
-              <div class="grid grid-cols-3 gap-2">
-                <UFormField label="City" name="pickup.city"
-                  ><UInput v-model="state.pickup.city" placeholder="City"
-                /></UFormField>
-                <UFormField label="State" name="pickup.state"
-                  ><UInput v-model="state.pickup.state" placeholder="State"
-                /></UFormField>
-                <UFormField label="Zip" name="pickup.zip"
-                  ><UInput v-model="state.pickup.zip" placeholder="Zip"
-                /></UFormField>
-              </div>
-            </div>
-
-            <div class="space-y-2 rounded-lg border p-4 dark:border-gray-700">
-              <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300">Dropoff Address</h3>
-
-              <!-- Custom Autocomplete -->
-              <div class="relative mb-2">
-                <UInput
-                  v-model="dropoffSearch"
-                  placeholder="Type to find existing address (e.g. Street)..."
-                  icon="i-lucide-search"
-                  autocomplete="off"
-                  class="w-full"
-                />
-                <div
-                  v-if="dropoffOptions?.length > 0 && dropoffSearch"
-                  class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                >
-                  <button
-                    v-for="opt in dropoffOptions"
-                    :key="opt.id"
-                    type="button"
-                    class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                    @click="onDropoffSelect(opt)"
-                  >
-                    {{ opt.label }}
-                  </button>
-                </div>
-              </div>
-
-              <UFormField label="Street" name="dropoff.street">
-                <UInput
-                  v-model="state.dropoff.street"
-                  placeholder="Street Address"
-                  class="w-full"
-                />
-              </UFormField>
-              <div class="grid grid-cols-3 gap-2">
-                <UFormField label="City" name="dropoff.city"
-                  ><UInput v-model="state.dropoff.city" placeholder="City"
-                /></UFormField>
-                <UFormField label="State" name="dropoff.state"
-                  ><UInput v-model="state.dropoff.state" placeholder="State"
-                /></UFormField>
-                <UFormField label="Zip" name="dropoff.zip"
-                  ><UInput v-model="state.dropoff.zip" placeholder="Zip"
-                /></UFormField>
-              </div>
-            </div>
-
-            <UFormField label="Volunteer" name="volunteerId" v-if="isAdmin">
-              <USelectMenu
-                v-model="state.volunteerId"
-                :items="volunteerOptions"
-                placeholder="Select a volunteer"
-                class="w-full"
-                searchable
-                option-attribute="label"
-              />
-            </UFormField>
-
-            <div class="grid grid-cols-2 gap-4">
-              <UFormField label="Appointment Time" name="scheduledTime">
-                <UInput v-model="state.scheduledTime" type="datetime-local" class="w-full" />
-              </UFormField>
-
-              <UFormField label="Pick Up Time (Optional)" name="pickupTime">
-                <UInput v-model="state.pickupTime" type="datetime-local" class="w-full" />
-              </UFormField>
-            </div>
-
-            <UFormField label="Notes" name="notes">
-              <UTextarea
-                v-model="state.notes"
-                placeholder="Additional instructions..."
-                class="w-full"
-              />
-            </UFormField>
-
-            <div class="flex justify-end gap-2 pt-4">
-              <UButton
-                label="Cancel"
-                color="neutral"
-                variant="ghost"
-                @click="isCreateModalOpen = false"
-              />
-              <UButton type="submit" label="Create" color="primary" />
-            </div>
-          </UForm>
-        </div>
-      </template>
-    </UModal>
   </UContainer>
 </template>
