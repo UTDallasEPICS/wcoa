@@ -1,0 +1,25 @@
+// Per-user, cross-device UI preferences. A sidecar to the (better-auth-managed)
+// `user` table so app preferences can be added without touching the auth
+// schema. The rides list filter/sort settings live here — previously browser
+// cookies — so a user sees the same view on every device until they change it.
+model UserPreference {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Comma-separated RideStatus values to SHOW in the rides list
+  // (e.g. "CREATED,ASSIGNED"). null = never set -> the client applies its
+  // default (active work: CREATED + ASSIGNED).
+  rideStatusFilter String?
+
+  // Rides list ordering: "asc" | "desc". null = client default.
+  rideSort String?
+
+  // Volunteers only: limit the rides list to rides assigned to me.
+  rideAssignedToMeOnly Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preference")
+}
