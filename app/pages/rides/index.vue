@@ -435,7 +435,13 @@
 
 <template>
   <UContainer class="py-10">
-    <div class="mb-6 flex items-center justify-end">
+    <!-- Page header: title + live result count, with Create Ride inline (was a
+         lone right-aligned button on its own row). -->
+    <div class="mb-6 flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Rides</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ total }} {{ total === 1 ? 'ride' : 'rides' }}</p>
+      </div>
       <UButton
         v-if="isAdmin"
         label="Create Ride"
@@ -445,43 +451,48 @@
       />
     </div>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
+    <!-- Toolbar: search keeps the full row width; the filter controls group and
+         wrap together beside it on wide screens instead of each stacking into a
+         tall full-width column. -->
+    <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
       <UInput
         v-model="search"
         icon="i-lucide-search"
-        placeholder="Search..."
-        class="w-full min-w-[200px] flex-1 sm:w-auto"
+        placeholder="Search rides..."
+        class="w-full lg:max-w-xs lg:flex-1"
       />
-      <USelect
-        v-model="sort"
-        :items="[
-          { label: 'Oldest First', value: 'asc' },
-          { label: 'Newest First', value: 'desc' },
-        ]"
-        class="w-36"
-      />
-      <USelectMenu
-        v-model="activeFilters"
-        :items="filterOptions"
-        multiple
-        :searchable="false"
-        :ui="{ input: 'hidden' }"
-        placeholder="Include Status"
-        class="w-full sm:w-64"
-      />
-      <USelectMenu
-        v-model="excludedFilters"
-        :items="filterOptions"
-        multiple
-        :searchable="false"
-        :ui="{ input: 'hidden' }"
-        placeholder="Exclude Status"
-        class="w-full sm:w-64"
-      />
-      <div class="flex items-center gap-2">
-        <UInput v-model="startDate" type="date" placeholder="Start" class="w-full sm:w-auto" />
-        <span class="text-gray-400">-</span>
-        <UInput v-model="endDate" type="date" placeholder="End" class="w-full sm:w-auto" />
+      <div class="flex flex-wrap items-center gap-3">
+        <USelect
+          v-model="sort"
+          :items="[
+            { label: 'Oldest First', value: 'asc' },
+            { label: 'Newest First', value: 'desc' },
+          ]"
+          class="w-full sm:w-40"
+        />
+        <USelectMenu
+          v-model="activeFilters"
+          :items="filterOptions"
+          multiple
+          :searchable="false"
+          :ui="{ input: 'hidden' }"
+          placeholder="Include status"
+          class="w-full sm:w-52"
+        />
+        <USelectMenu
+          v-model="excludedFilters"
+          :items="filterOptions"
+          multiple
+          :searchable="false"
+          :ui="{ input: 'hidden' }"
+          placeholder="Exclude status"
+          class="w-full sm:w-52"
+        />
+        <div class="flex flex-1 items-center gap-2">
+          <UInput v-model="startDate" type="date" class="w-full sm:w-auto" />
+          <span class="text-gray-400">–</span>
+          <UInput v-model="endDate" type="date" class="w-full sm:w-auto" />
+        </div>
       </div>
     </div>
 
@@ -493,7 +504,15 @@
       :loading="status === 'pending'"
       class="hidden w-full cursor-pointer lg:block"
       @select="onSelect"
-    />
+    >
+      <template #empty-state>
+        <div class="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+          <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+          <p class="font-medium">No rides found</p>
+          <p class="text-sm">Try adjusting your search or filters</p>
+        </div>
+      </template>
+    </UTable>
 
     <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
          same navigation target — only the presentation differs. -->
