@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { blankRideForm } from '../utils/rideForm'
 
-  // The Create Ride flow as a 4-step wizard (Client -> Route -> Schedule ->
+  // The Create Ride flow as a 3-step wizard (Client & route -> Schedule ->
   // Review). Rendered as a side pane on desktop and full-screen on mobile by the
   // parent; this component only owns the wizard itself. Create is admin-only, so
   // the parent gates it behind isAdmin (the volunteer picker is always shown).
@@ -14,10 +14,9 @@
   const toast = useToast()
 
   const STEPS = [
-    { n: 1, label: 'Client' },
-    { n: 2, label: 'Route' },
-    { n: 3, label: 'Schedule' },
-    { n: 4, label: 'Review' },
+    { n: 1, label: 'Client & route' },
+    { n: 2, label: 'Schedule' },
+    { n: 3, label: 'Review' },
   ]
   const step = ref(1)
   const submitting = ref(false)
@@ -44,20 +43,17 @@
   const selectedClient = computed(() => props.clients?.find((c) => c.id === clientId.value))
 
   // Pre-fill pickup from the client's home address when a client is chosen.
-  watch(
-    clientId,
-    (id) => {
-      const client = props.clients?.find((c) => c.id === id)
-      if (client?.homeAddress) {
-        Object.assign(state.pickup, {
-          street: client.homeAddress.street,
-          city: client.homeAddress.city,
-          state: client.homeAddress.state,
-          zip: client.homeAddress.zip,
-        })
-      }
+  watch(clientId, (id) => {
+    const client = props.clients?.find((c) => c.id === id)
+    if (client?.homeAddress) {
+      Object.assign(state.pickup, {
+        street: client.homeAddress.street,
+        city: client.homeAddress.city,
+        state: client.homeAddress.state,
+        zip: client.homeAddress.zip,
+      })
     }
-  )
+  })
 
   // Shown under the pickup summary only while pickup still matches the client's
   // home address — clears itself if the admin edits pickup to something else.
@@ -75,14 +71,14 @@
 
   // Whether the current step is complete enough to advance.
   const canContinue = computed(() => {
-    if (step.value === 1) return !!clientId.value
-    if (step.value === 2) return addressComplete(state.pickup) && addressComplete(state.dropoff)
-    if (step.value === 3) return !!state.scheduledTime
+    if (step.value === 1)
+      return !!clientId.value && addressComplete(state.pickup) && addressComplete(state.dropoff)
+    if (step.value === 2) return !!state.scheduledTime
     return true
   })
 
   function next() {
-    if (step.value < 4 && canContinue.value) step.value++
+    if (step.value < 3 && canContinue.value) step.value++
   }
   function back() {
     if (step.value > 1) step.value--
@@ -194,8 +190,8 @@
 
     <!-- Body -->
     <div class="flex-1 overflow-y-auto p-4">
-      <!-- Step 1: Client -->
-      <div v-show="step === 1" class="space-y-4">
+      <!-- Step 1: Client & route -->
+      <div v-show="step === 1" class="space-y-5">
         <div>
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Client
@@ -209,30 +205,12 @@
             class="w-full"
           />
         </div>
-        <div
-          v-if="selectedClient"
-          class="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-        >
-          <p class="font-semibold text-gray-900 dark:text-white">{{ selectedClient.name }}</p>
-          <p
-            v-if="selectedClient.homeAddress"
-            class="text-primary mt-1 flex items-center gap-1.5 text-xs"
-          >
-            <UIcon name="i-lucide-map-pin" class="size-3.5" />
-            Pickup will use {{ selectedClient.homeAddress.street }},
-            {{ selectedClient.homeAddress.city }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Step 2: Route -->
-      <div v-show="step === 2" class="space-y-5">
         <AddressField v-model="state.pickup" label="Pickup" :hint="pickupHint" />
         <AddressField v-model="state.dropoff" label="Dropoff" />
       </div>
 
-      <!-- Step 3: Schedule & details -->
-      <div v-show="step === 3" class="space-y-4">
+      <!-- Step 2: Schedule & details -->
+      <div v-show="step === 2" class="space-y-4">
         <div>
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Appointment time
@@ -265,8 +243,8 @@
         </div>
       </div>
 
-      <!-- Step 4: Review -->
-      <div v-show="step === 4" class="space-y-3">
+      <!-- Step 3: Review -->
+      <div v-show="step === 3" class="space-y-3">
         <p class="text-sm text-gray-500">Check the details, then create the ride.</p>
         <dl
           class="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-700"
@@ -329,10 +307,10 @@
         :disabled="submitting"
         @click="back"
       />
-      <span v-else class="text-xs text-gray-400">Step {{ step }} of 4</span>
+      <span v-else class="text-xs text-gray-400">Step {{ step }} of 3</span>
 
       <UButton
-        v-if="step < 4"
+        v-if="step < 3"
         label="Continue"
         color="primary"
         trailing-icon="i-lucide-chevron-right"
