@@ -199,6 +199,112 @@
     }
   }
 
+  // Status → badge color, matching the rides list so the two pages agree.
+  type StatusColor = 'info' | 'warning' | 'success' | 'error' | 'neutral'
+  function statusColor(status: string): StatusColor {
+    const map: Record<string, StatusColor> = {
+      CREATED: 'info',
+      ASSIGNED: 'warning',
+      COMPLETED: 'success',
+      CANCELLED: 'error',
+    }
+    return map[status] || 'neutral'
+  }
+
+  // Role/status-gated actions defined once and rendered in two places: an inline
+  // cluster on desktop and a sticky bar on mobile. The conditions mirror the
+  // original per-button v-ifs exactly. `primary` marks the main CTA (filled and
+  // full-width on the mobile bar); by construction at most one is ever present.
+  type RideAction = {
+    key: string
+    label: string
+    icon: string
+    color: 'primary' | 'success' | 'warning' | 'error' | 'neutral'
+    variant?: 'subtle'
+    primary?: boolean
+    onClick: () => void
+  }
+
+  const actions = computed<RideAction[]>(() => {
+    const r = ride.value
+    if (!r) return []
+    const s = r.status
+    const list: RideAction[] = []
+
+    if (isVolunteer.value && !isAssignedToMe.value && s === 'CREATED') {
+      list.push({
+        key: 'signup',
+        label: 'Sign Up',
+        icon: 'i-lucide-user-plus',
+        color: 'primary',
+        primary: true,
+        onClick: () => handleVolunteerAction('signup'),
+      })
+    }
+    if (isVolunteer.value && isAssignedToMe.value && s === 'ASSIGNED') {
+      list.push({
+        key: 'complete',
+        label: 'Mark as Completed',
+        icon: 'i-lucide-check',
+        color: 'success',
+        primary: true,
+        onClick: () => handleVolunteerAction('complete'),
+      })
+      list.push({
+        key: 'unsignup',
+        label: 'Unsign Up',
+        icon: 'i-lucide-user-minus',
+        color: 'warning',
+        variant: 'subtle',
+        onClick: () => handleVolunteerAction('unsignup'),
+      })
+    }
+    if (isAdmin.value || (isVolunteer.value && isAssignedToMe.value && s === 'COMPLETED')) {
+      list.push({
+        key: 'edit',
+        label: 'Edit',
+        icon: 'i-lucide-edit',
+        color: 'neutral',
+        variant: 'subtle',
+        primary: true,
+        onClick: () => {
+          isEditModalOpen.value = true
+        },
+      })
+    }
+    if (isAdmin.value && s !== 'CANCELLED' && s !== 'COMPLETED') {
+      list.push({
+        key: 'cancel',
+        label: 'Cancel Ride',
+        icon: 'i-lucide-ban',
+        color: 'warning',
+        variant: 'subtle',
+        onClick: () => {
+          isCancelModalOpen.value = true
+        },
+      })
+    }
+    if (isAdmin.value) {
+      list.push({
+        key: 'delete',
+        label: 'Delete',
+        icon: 'i-lucide-trash',
+        color: 'error',
+        variant: 'subtle',
+        onClick: () => {
+          isDeleteModalOpen.value = true
+        },
+      })
+    }
+    return list
+  })
+
+  // Mobile bar: one filled primary + the rest as icon-only buttons.
+  const primaryAction = computed<RideAction | null>(
+    () => actions.value.find((a) => a.primary) ?? actions.value[0] ?? null
+  )
+  const secondaryActions = computed(() => actions.value.filter((a) => a !== primaryAction.value))
+
   const mapUrl = computed(() => {
     if (!ride.value) return ''
     const origin = encodeURIComponent(ride.value.pickupDisplay)
@@ -244,204 +350,209 @@
       <UButton to="/rides" label="Back to Rides" color="neutral" variant="ghost" />
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-      <!-- Left Column: Details -->
-      <div class="space-y-6 lg:col-span-1">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h2 class="text-xl font-bold">Ride Information</h2>
-              <UBadge
-                :color="
-                  ride.status === 'COMPLETED'
-                    ? 'success'
-                    : ride.status === 'CANCELLED'
-                      ? 'error'
-                      : 'info'
-                "
-                variant="subtle"
-              >
-                {{ ride.status }}
-              </UBadge>
-            </div>
-          </template>
-
-          <div class="space-y-4">
-            <div>
-              <p class="text-sm text-gray-500">Appointment Time</p>
-              <p class="font-medium">
-                {{ formatDateTime(ride.scheduledTime) }}
-              </p>
-            </div>
-
-            <div v-if="ride.pickupTime">
-              <p class="text-error text-sm text-gray-500">Pick Up Time</p>
-              <p class="text-error font-bold">
-                {{ formatDateTime(ride.pickupTime) }}
-              </p>
-            </div>
-
-            <div>
-              <p class="text-sm text-gray-500">Client</p>
-              <p class="font-medium">{{ ride.client?.user?.name }}</p>
-              <!-- Hide client email from volunteers if strictly needed, but let's keep it for contact -->
-              <p class="text-sm text-gray-500">{{ formatPhoneNumber(ride.client?.user?.phone) }}</p>
-            </div>
-
-            <div>
-              <p class="text-sm text-gray-500">Volunteer</p>
-              <p class="font-medium" v-if="ride.volunteer">
-                {{ ride.volunteer?.user?.name }}
-              </p>
-              <p class="text-gray-400 italic" v-else>No volunteer assigned</p>
-              <p class="text-sm text-gray-500">
-                {{ formatPhoneNumber(ride.volunteer?.user?.phone) }}
-              </p>
-            </div>
-
-            <div v-if="ride.status === 'COMPLETED' || ride.totalRideTime">
-              <p class="text-sm text-gray-500">Total Ride Time</p>
-              <p class="font-medium">{{ ride.totalRideTime || 0 }} hours</p>
-            </div>
-
-            <div v-if="ride.notes">
-              <p class="text-sm text-gray-500">Notes</p>
-              <p
-                class="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200"
-              >
-                {{ ride.notes }}
-              </p>
-            </div>
-          </div>
-
-          <template #footer>
-            <div class="flex gap-2">
-              <UButton
-                v-if="isAdmin || (isVolunteer && isAssignedToMe && ride.status === 'COMPLETED')"
-                label="Edit"
-                icon="i-lucide-edit"
-                variant="subtle"
-                class="flex-1 justify-center"
-                @click="isEditModalOpen = true"
-              />
-              <UButton
-                v-if="isAdmin && ride.status !== 'CANCELLED' && ride.status !== 'COMPLETED'"
-                label="Cancel Ride"
-                icon="i-lucide-ban"
-                color="warning"
-                variant="subtle"
-                @click="isCancelModalOpen = true"
-              />
-              <UButton
-                v-if="isAdmin"
-                label="Delete"
-                icon="i-lucide-trash"
-                color="error"
-                variant="subtle"
-                @click="isDeleteModalOpen = true"
-              />
-              <UButton
-                v-if="isVolunteer && !isAssignedToMe && ride.status === 'CREATED'"
-                label="Sign Up"
-                icon="i-lucide-user-plus"
-                color="primary"
-                class="flex-1 justify-center"
-                @click="handleVolunteerAction('signup')"
-              />
-              <UButton
-                v-if="isVolunteer && isAssignedToMe && ride.status === 'ASSIGNED'"
-                label="Unsign Up"
-                icon="i-lucide-user-minus"
-                color="warning"
-                variant="subtle"
-                class="flex-1 justify-center"
-                @click="handleVolunteerAction('unsignup')"
-              />
-              <UButton
-                v-if="isVolunteer && isAssignedToMe && ride.status === 'ASSIGNED'"
-                label="Mark as Completed"
-                icon="i-lucide-check"
-                color="success"
-                class="flex-1 justify-center"
-                @click="handleVolunteerAction('complete')"
-              />
-            </div>
-          </template>
-        </UCard>
-      </div>
-
-      <!-- Right Column: Map and Route -->
-      <div class="space-y-6 lg:col-span-2">
-        <UCard>
-          <template #header>
-            <h2 class="text-xl font-bold">Route</h2>
-          </template>
-
-          <div class="space-y-4">
-            <div class="flex items-start gap-3">
-              <UIcon name="i-lucide-map-pin" class="text-primary mt-1 size-5" />
-              <div>
-                <p class="text-sm text-gray-500">Pickup</p>
-                <p class="font-medium">{{ ride.pickupDisplay }}</p>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-3">
-              <UIcon name="i-lucide-flag" class="text-error mt-1 size-5" />
-              <div>
-                <p class="text-sm text-gray-500">Dropoff</p>
-                <p class="font-medium">{{ ride.dropoffDisplay }}</p>
-              </div>
-            </div>
-
-            <div
-              v-if="estimate && !estimate.error"
-              class="flex gap-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50"
-            >
-              <div>
-                <p class="text-sm text-gray-500">Est. Duration</p>
-                <p class="font-medium">{{ estimate.duration }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Distance</p>
-                <p class="font-medium">{{ estimate.distance }}</p>
-              </div>
-            </div>
-
+    <template v-else>
+      <!-- Identity header: who / when / status, with the desktop action cluster.
+           On mobile these actions move to a sticky bar pinned at the bottom. -->
+      <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {{ ride.client?.user?.name }}
+          </h1>
+          <p class="mt-1 text-sm text-gray-500">
+            {{
+              formatDateTime(ride.scheduledTime, {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            }}
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
+            {{ ride.status }}
+          </UBadge>
+          <div class="hidden gap-2 lg:flex">
             <UButton
-              :to="navigateUrl"
-              target="_blank"
-              rel="noopener"
-              label="Navigate"
-              icon="i-lucide-navigation"
-              color="primary"
-              size="lg"
-              block
-              external
-              data-testid="navigate-link"
+              v-for="a in actions"
+              :key="a.key"
+              :label="a.label"
+              :icon="a.icon"
+              :color="a.color"
+              :variant="a.variant"
+              @click="a.onClick"
             />
+          </div>
+        </div>
+      </div>
 
-            <div class="aspect-video w-full overflow-hidden rounded-lg border">
-              <iframe
-                v-if="mapUrl && useRuntimeConfig().public.googleMapsApiKey"
-                width="100%"
-                height="100%"
-                frameborder="0"
-                style="border: 0"
-                :src="mapUrl"
-                allowfullscreen
-              ></iframe>
-              <div
-                v-else
-                class="flex h-full items-center justify-center bg-gray-100 text-gray-400 italic"
-              >
-                Map API Key missing or invalid address
+      <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <!-- Left Column: Details -->
+        <div class="space-y-6 lg:col-span-1">
+          <UCard>
+            <template #header>
+              <h2 class="text-xl font-bold">Ride Information</h2>
+            </template>
+
+            <div class="space-y-4">
+              <div>
+                <p class="text-sm text-gray-500">Appointment Time</p>
+                <p class="font-medium">
+                  {{ formatDateTime(ride.scheduledTime) }}
+                </p>
+              </div>
+
+              <div v-if="ride.pickupTime">
+                <p class="text-error text-sm text-gray-500">Pick Up Time</p>
+                <p class="text-error font-bold">
+                  {{ formatDateTime(ride.pickupTime) }}
+                </p>
+              </div>
+
+              <div>
+                <p class="text-sm text-gray-500">Client</p>
+                <p class="font-medium">{{ ride.client?.user?.name }}</p>
+                <!-- Hide client email from volunteers if strictly needed, but let's keep it for contact -->
+                <p class="text-sm text-gray-500">
+                  {{ formatPhoneNumber(ride.client?.user?.phone) }}
+                </p>
+              </div>
+
+              <div>
+                <p class="text-sm text-gray-500">Volunteer</p>
+                <p class="font-medium" v-if="ride.volunteer">
+                  {{ ride.volunteer?.user?.name }}
+                </p>
+                <p class="text-gray-400 italic" v-else>No volunteer assigned</p>
+                <p class="text-sm text-gray-500">
+                  {{ formatPhoneNumber(ride.volunteer?.user?.phone) }}
+                </p>
+              </div>
+
+              <div v-if="ride.status === 'COMPLETED' || ride.totalRideTime">
+                <p class="text-sm text-gray-500">Total Ride Time</p>
+                <p class="font-medium">{{ ride.totalRideTime || 0 }} hours</p>
+              </div>
+
+              <div v-if="ride.notes">
+                <p class="text-sm text-gray-500">Notes</p>
+                <p
+                  class="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-200"
+                >
+                  {{ ride.notes }}
+                </p>
               </div>
             </div>
-          </div>
-        </UCard>
+          </UCard>
+        </div>
+
+        <!-- Right Column: Map and Route -->
+        <div class="space-y-6 lg:col-span-2">
+          <UCard>
+            <template #header>
+              <h2 class="text-xl font-bold">Route</h2>
+            </template>
+
+            <div class="space-y-4">
+              <div class="flex items-start gap-3">
+                <UIcon name="i-lucide-map-pin" class="text-primary mt-1 size-5" />
+                <div>
+                  <p class="text-sm text-gray-500">Pickup</p>
+                  <p class="font-medium">{{ ride.pickupDisplay }}</p>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                <UIcon name="i-lucide-flag" class="text-error mt-1 size-5" />
+                <div>
+                  <p class="text-sm text-gray-500">Dropoff</p>
+                  <p class="font-medium">{{ ride.dropoffDisplay }}</p>
+                </div>
+              </div>
+
+              <div
+                v-if="estimate && !estimate.error"
+                class="flex gap-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50"
+              >
+                <div>
+                  <p class="text-sm text-gray-500">Est. Duration</p>
+                  <p class="font-medium">{{ estimate.duration }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Distance</p>
+                  <p class="font-medium">{{ estimate.distance }}</p>
+                </div>
+              </div>
+
+              <UButton
+                :to="navigateUrl"
+                target="_blank"
+                rel="noopener"
+                label="Navigate"
+                icon="i-lucide-navigation"
+                color="primary"
+                size="lg"
+                block
+                external
+                data-testid="navigate-link"
+              />
+
+              <div class="aspect-video w-full overflow-hidden rounded-lg border">
+                <iframe
+                  v-if="mapUrl && useRuntimeConfig().public.googleMapsApiKey"
+                  width="100%"
+                  height="100%"
+                  frameborder="0"
+                  style="border: 0"
+                  :src="mapUrl"
+                  allowfullscreen
+                ></iframe>
+                <div
+                  v-else
+                  class="flex h-full items-center justify-center bg-gray-100 text-gray-400 italic"
+                >
+                  Map API Key missing or invalid address
+                </div>
+              </div>
+            </div>
+          </UCard>
+        </div>
       </div>
-    </div>
+
+      <!-- Spacer so page content isn't hidden behind the fixed mobile bar. -->
+      <div v-if="primaryAction" aria-hidden="true" class="h-24 lg:hidden"></div>
+
+      <!-- Mobile action bar: docked flush to the bottom edge — full width, only
+           the top corners rounded. One filled primary action (thumb-reachable)
+           plus any secondary actions as icon buttons. Hidden on lg+, where the
+           actions live inline in the header instead. -->
+      <div
+        v-if="primaryAction"
+        class="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 rounded-t-xl border-t border-gray-200 bg-white/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden dark:border-gray-700 dark:bg-gray-900/95"
+      >
+        <UButton
+          v-for="a in secondaryActions"
+          :key="a.key"
+          :icon="a.icon"
+          :color="a.color"
+          :variant="a.variant || 'subtle'"
+          size="lg"
+          square
+          :aria-label="a.label"
+          @click="a.onClick"
+        />
+        <UButton
+          :label="primaryAction.label"
+          :icon="primaryAction.icon"
+          :color="primaryAction.color"
+          size="lg"
+          class="flex-1 justify-center"
+          @click="primaryAction.onClick"
+        />
+      </div>
+    </template>
 
     <!-- Edit Modal -->
     <UModal v-model:open="isEditModalOpen" title="Edit Ride">

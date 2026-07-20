@@ -10,6 +10,7 @@
   } from '../../utils/rideFilters'
 
   const UBadge = resolveComponent('UBadge')
+  const UIcon = resolveComponent('UIcon')
 
   const { data: session } = await authClient.useSession(useFetch)
   const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
@@ -259,59 +260,127 @@
   // (issue #13) so they compose with pagination. The table binds directly to
   // the returned page (`rides`) — no client-side filtering pass.
 
+  // Status → badge color, shared by the desktop table and the mobile cards so
+  // the two breakpoints can never drift apart.
+  type StatusColor = 'info' | 'warning' | 'success' | 'error' | 'neutral'
+  function statusColor(status: string): StatusColor {
+    const map: Record<string, StatusColor> = {
+      CREATED: 'info',
+      ASSIGNED: 'warning',
+      COMPLETED: 'success',
+      CANCELLED: 'error',
+    }
+    return map[status] || 'neutral'
+  }
+
+  // Initials for the volunteer avatar chip (first + last word), shared shape
+  // with the mobile cards' status treatment.
+  function initials(name?: string | null): string {
+    if (!name) return '?'
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    if (!parts.length) return '?'
+    const first = parts[0][0] ?? ''
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : ''
+    return (first + last).toUpperCase() || '?'
+  }
+
   const columns: TableColumn<any>[] = [
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => {
-        const color =
+      cell: ({ row }) =>
+        h(
+          UBadge,
           {
-            CREATED: 'info' as const,
-            ASSIGNED: 'warning' as const,
-            COMPLETED: 'success' as const,
-            CANCELLED: 'error' as const,
-          }[row.getValue('status') as string] || 'neutral'
-
-        return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
-          row.getValue('status')
-        )
+            class: 'capitalize',
+            variant: 'subtle',
+            color: statusColor(row.getValue('status') as string),
+          },
+          () => row.getValue('status')
+        ),
+    },
+    {
+      id: 'client',
+      header: 'Client',
+      cell: ({ row }) => {
+        const phone = formatPhoneNumber(row.original.client?.user?.phone)
+        return h('div', { class: 'leading-tight' }, [
+          h(
+            'div',
+            { class: 'font-medium text-gray-900 dark:text-white' },
+            row.original.client?.user?.name
+          ),
+          phone ? h('div', { class: 'text-xs text-gray-500' }, phone) : null,
+        ])
+      },
+    },
+    {
+      id: 'route',
+      header: 'Route',
+      // Pickup and dropoff collapse into one cell so origin -> destination reads
+      // at a glance instead of two separate, truncated address columns.
+      cell: ({ row }) => {
+        const leg = (icon: string, iconClass: string, text: string) =>
+          h('div', { class: 'flex items-center gap-2' }, [
+            h(UIcon, { name: icon, class: `${iconClass} size-3.5 shrink-0` }),
+            h(
+              'span',
+              { class: 'max-w-[240px] truncate text-gray-600 dark:text-gray-300', title: text },
+              text
+            ),
+          ])
+        return h('div', { class: 'flex flex-col gap-1 text-sm' }, [
+          leg('i-lucide-map-pin', 'text-primary', row.original.pickupDisplay),
+          leg('i-lucide-flag', 'text-error', row.original.dropoffDisplay),
+        ])
+      },
+    },
+    {
+      accessorKey: 'scheduledTime',
+      header: 'When',
+      cell: ({ row }) => {
+        // Pinned locale + timezone so SSR and client agree (issue #98).
+        const t = row.getValue('scheduledTime') as string
+        return h('div', { class: 'leading-tight' }, [
+          h(
+            'div',
+            { class: 'font-medium text-gray-900 dark:text-white' },
+            formatDateTime(t, { weekday: 'short', month: 'short', day: 'numeric' })
+          ),
+          h(
+            'div',
+            { class: 'text-xs text-gray-500' },
+            formatDateTime(t, { hour: '2-digit', minute: '2-digit' })
+          ),
+        ])
       },
     },
     {
       id: 'volunteer',
       header: 'Volunteer',
       cell: ({ row }) => {
-        return (
-          row.original.volunteer?.user?.name ||
-          h('span', { class: 'text-gray-400 italic' }, 'Unassigned')
-        )
+        const name = row.original.volunteer?.user?.name
+        if (!name) return h('span', { class: 'text-sm text-gray-400 italic' }, 'Unassigned')
+        return h('div', { class: 'flex items-center gap-2' }, [
+          h(
+            'span',
+            {
+              class:
+                'flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+            },
+            initials(name)
+          ),
+          h('span', { class: 'text-sm' }, name),
+        ])
       },
     },
     {
-      accessorKey: 'scheduledTime',
-      header: 'Date',
-      cell: ({ row }) => {
-        // Pinned locale + timezone so SSR and client agree (issue #98).
-        return formatDateTime(row.getValue('scheduledTime'), {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      },
-    },
-    {
-      accessorKey: 'client.user.name',
-      header: 'Client',
-    },
-    {
-      accessorKey: 'pickupDisplay',
-      header: 'Pickup',
-    },
-    {
-      accessorKey: 'dropoffDisplay',
-      header: 'Dropoff',
+      id: 'chevron',
+      header: '',
+      cell: () =>
+        h('div', { class: 'flex justify-end' }, [
+          h(UIcon, { name: 'i-lucide-chevron-right', class: 'size-4 text-gray-400' }),
+        ]),
     },
   ]
 
@@ -366,7 +435,13 @@
 
 <template>
   <UContainer class="py-10">
-    <div class="mb-6 flex items-center justify-end">
+    <!-- Page header: title + live result count, with Create Ride inline (was a
+         lone right-aligned button on its own row). -->
+    <div class="mb-6 flex items-end justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Rides</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ total }} {{ total === 1 ? 'ride' : 'rides' }}</p>
+      </div>
       <UButton
         v-if="isAdmin"
         label="Create Ride"
@@ -376,53 +451,146 @@
       />
     </div>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
+    <!-- Toolbar: search keeps the full row width; the filter controls group and
+         wrap together beside it on wide screens instead of each stacking into a
+         tall full-width column. -->
+    <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
       <UInput
         v-model="search"
         icon="i-lucide-search"
-        placeholder="Search..."
-        class="w-full min-w-[200px] flex-1 sm:w-auto"
+        placeholder="Search rides..."
+        class="w-full lg:max-w-xs lg:flex-1"
       />
-      <USelect
-        v-model="sort"
-        :items="[
-          { label: 'Oldest First', value: 'asc' },
-          { label: 'Newest First', value: 'desc' },
-        ]"
-        class="w-36"
-      />
-      <USelectMenu
-        v-model="activeFilters"
-        :items="filterOptions"
-        multiple
-        :searchable="false"
-        :ui="{ input: 'hidden' }"
-        placeholder="Include Status"
-        class="w-full sm:w-64"
-      />
-      <USelectMenu
-        v-model="excludedFilters"
-        :items="filterOptions"
-        multiple
-        :searchable="false"
-        :ui="{ input: 'hidden' }"
-        placeholder="Exclude Status"
-        class="w-full sm:w-64"
-      />
-      <div class="flex items-center gap-2">
-        <UInput v-model="startDate" type="date" placeholder="Start" class="w-full sm:w-auto" />
-        <span class="text-gray-400">-</span>
-        <UInput v-model="endDate" type="date" placeholder="End" class="w-full sm:w-auto" />
+      <div class="flex flex-wrap items-center gap-3">
+        <USelect
+          v-model="sort"
+          :items="[
+            { label: 'Oldest First', value: 'asc' },
+            { label: 'Newest First', value: 'desc' },
+          ]"
+          class="w-full sm:w-40"
+        />
+        <USelectMenu
+          v-model="activeFilters"
+          :items="filterOptions"
+          multiple
+          :searchable="false"
+          :ui="{ input: 'hidden' }"
+          placeholder="Include status"
+          class="w-full sm:w-52"
+        />
+        <USelectMenu
+          v-model="excludedFilters"
+          :items="filterOptions"
+          multiple
+          :searchable="false"
+          :ui="{ input: 'hidden' }"
+          placeholder="Exclude status"
+          class="w-full sm:w-52"
+        />
+        <div class="flex flex-1 items-center gap-2">
+          <UInput v-model="startDate" type="date" class="w-full sm:w-auto" />
+          <span class="text-gray-400">–</span>
+          <UInput v-model="endDate" type="date" class="w-full sm:w-auto" />
+        </div>
       </div>
     </div>
 
+    <!-- Desktop (lg+): the full table. Below lg it would overflow sideways, so
+         it's hidden in favour of the ride cards below. -->
     <UTable
       :data="rides"
       :columns="columns"
       :loading="status === 'pending'"
-      class="w-full cursor-pointer"
+      class="hidden w-full cursor-pointer lg:block"
       @select="onSelect"
-    />
+    >
+      <template #empty-state>
+        <div class="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+          <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+          <p class="font-medium">No rides found</p>
+          <p class="text-sm">Try adjusting your search or filters</p>
+        </div>
+      </template>
+    </UTable>
+
+    <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
+         same navigation target — only the presentation differs. -->
+    <div class="lg:hidden">
+      <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
+      </div>
+
+      <div
+        v-else-if="rides.length === 0"
+        class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-16 text-center text-gray-500 dark:border-gray-700"
+      >
+        <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+        <p class="font-medium">No rides found</p>
+        <p class="text-sm">Try adjusting your search or filters</p>
+      </div>
+
+      <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <NuxtLink
+          v-for="ride in rides"
+          :key="ride.id"
+          :to="`/rides/${ride.id}`"
+          class="focus-visible:ring-primary block rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 focus:outline-none focus-visible:ring-2 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+        >
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
+              {{ ride.status }}
+            </UBadge>
+            <span class="text-xs font-medium text-gray-500">
+              {{
+                formatDateTime(ride.scheduledTime, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              }}
+            </span>
+          </div>
+
+          <p class="font-semibold text-gray-900 dark:text-white">
+            {{ ride.client?.user?.name }}
+          </p>
+
+          <div class="mt-3 space-y-1.5">
+            <div class="flex items-start gap-2">
+              <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{ ride.pickupDisplay }}</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <UIcon name="i-lucide-flag" class="text-error mt-0.5 size-4 shrink-0" />
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{
+                ride.dropoffDisplay
+              }}</span>
+            </div>
+          </div>
+
+          <div
+            class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800"
+          >
+            <span
+              v-if="ride.volunteer?.user?.name"
+              class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+            >
+              <span
+                class="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              >
+                {{ initials(ride.volunteer.user.name) }}
+              </span>
+              {{ ride.volunteer.user.name }}
+            </span>
+            <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
+            <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
+          </div>
+        </NuxtLink>
+      </div>
+    </div>
 
     <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
       <UPagination
