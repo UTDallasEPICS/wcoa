@@ -23,5 +23,6 @@ export default defineEventHandler(async (event) => {
       pref?.rideStatusFilter != null ? pref.rideStatusFilter.split(',').filter(Boolean) : null,
     rideSort: pref?.rideSort ?? null,
     rideAssignedToMeOnly: pref?.rideAssignedToMeOnly ?? false,
+    ridesPerPage: pref?.ridesPerPage ?? null,
   }
 })

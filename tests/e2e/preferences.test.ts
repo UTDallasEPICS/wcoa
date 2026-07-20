@@ -12,6 +12,7 @@ type Prefs = {
   rideStatusFilter: string[] | null
   rideSort: string | null
   rideAssignedToMeOnly: boolean
+  ridesPerPage: number | null
 }
 
 describe('user preferences API', () => {
@@ -21,6 +22,19 @@ describe('user preferences API', () => {
     expect(res.rideStatusFilter).toBeNull()
     expect(res.rideSort).toBeNull()
     expect(res.rideAssignedToMeOnly).toBe(false)
+    expect(res.ridesPerPage).toBeNull()
+  })
+
+  it('persists rows-per-page (ridesPerPage) and reads it back', async () => {
+    const cookie = await loginAs('bob@example.com')
+    const put = await $fetch<Prefs>('/api/put/preferences', {
+      method: 'PUT',
+      headers: { cookie },
+      body: { ridesPerPage: 50 },
+    })
+    expect(put.ridesPerPage).toBe(50)
+    const get = await $fetch<Prefs>('/api/get/preferences', { headers: { cookie } })
+    expect(get.ridesPerPage).toBe(50)
   })
 
   it('persists a PUT and reads it back (status filter round-trips as an array)', async () => {

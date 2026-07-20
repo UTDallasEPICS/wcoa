@@ -18,6 +18,10 @@ model UserPreference {
   // Volunteers only: limit the rides list to rides assigned to me.
   rideAssignedToMeOnly Boolean @default(false)
 
+  // Rows-per-page for the rides list, persisted so it follows the user across
+  // devices. null = client default (10).
+  ridesPerPage Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

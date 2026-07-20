@@ -15,6 +15,7 @@ const prefSchema = z
     rideStatusFilter: z.array(z.enum(RIDE_STATUSES)).optional(),
     rideSort: z.enum(['asc', 'desc']).optional(),
     rideAssignedToMeOnly: z.boolean().optional(),
+    ridesPerPage: z.number().int().positive().max(100).optional(),
   })
   .strict()
 
@@ -33,6 +34,7 @@ export default defineEventHandler(async (event) => {
     rideStatusFilter?: string
     rideSort?: string
     rideAssignedToMeOnly?: boolean
+    ridesPerPage?: number
   } = {}
   if (body.rideStatusFilter !== undefined) {
     data.rideStatusFilter = Array.from(new Set(body.rideStatusFilter)).join(',')
@@ -41,6 +43,7 @@ export default defineEventHandler(async (event) => {
   if (body.rideAssignedToMeOnly !== undefined) {
     data.rideAssignedToMeOnly = body.rideAssignedToMeOnly
   }
+  if (body.ridesPerPage !== undefined) data.ridesPerPage = body.ridesPerPage
 
   const pref = await prisma.userPreference.upsert({
     where: { userId },
@@ -53,5 +56,6 @@ export default defineEventHandler(async (event) => {
       pref.rideStatusFilter != null ? pref.rideStatusFilter.split(',').filter(Boolean) : null,
     rideSort: pref.rideSort ?? null,
     rideAssignedToMeOnly: pref.rideAssignedToMeOnly,
+    ridesPerPage: pref.ridesPerPage ?? null,
   }
 })

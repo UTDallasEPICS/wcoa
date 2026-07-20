@@ -44,7 +44,8 @@
   // Filtering, sorting and pagination all happen on the server so the table
   // binds directly to the returned page. Debounce search so typing doesn't fire
   // a request per keystroke.
-  const PAGE_SIZE = 20
+  const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
+  const pageSize = ref<number>(prefs.value?.ridesPerPage ?? 10)
   const page = ref(1)
   const debouncedSearch = ref('')
   const applyDebouncedSearch = debounce((value: string) => {
@@ -71,7 +72,7 @@
     query: {
       sort,
       page,
-      pageSize: PAGE_SIZE,
+      pageSize,
       search: computed(() => debouncedSearch.value || undefined),
       startDate: computed(() => startDate.value || undefined),
       endDate: computed(() => endDate.value || undefined),
@@ -84,7 +85,7 @@
 
   // Any filter/search/sort change should return to the first page so results
   // aren't hidden on a page that no longer exists.
-  watch([debouncedSearch, startDate, endDate, includeParam, sort], () => {
+  watch([debouncedSearch, startDate, endDate, includeParam, sort, pageSize], () => {
     page.value = 1
   })
 
@@ -98,10 +99,11 @@
         rideStatusFilter: sanitizeStatuses(selectedStatuses.value),
         rideSort: sort.value,
         rideAssignedToMeOnly: !isAdmin.value && assignedToMe.value,
+        ridesPerPage: Number(pageSize.value),
       },
     }).catch((err) => console.error('Failed to save preferences', err))
   }, 400)
-  watch([selectedStatuses, sort, assignedToMe], () => savePreferences(), { deep: true })
+  watch([selectedStatuses, sort, assignedToMe, pageSize], () => savePreferences(), { deep: true })
 
   // One-time migration off the old cookie model: if the user has no saved DB
   // preference yet but a legacy cookie exists, convert it, persist once, and
@@ -329,10 +331,9 @@
 </script>
 
 <template>
-  <UContainer class="py-10">
-    <!-- Page header: title + live result count, with Create Ride inline (was a
-         lone right-aligned button on its own row). -->
-    <div class="mb-6 flex items-end justify-between gap-4">
+  <UContainer class="flex h-[calc(100dvh-var(--ui-header-height))] flex-col overflow-hidden py-6">
+    <!-- Page header: title + live result count, with Create Ride inline. -->
+    <div class="mb-4 flex shrink-0 items-end justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Rides</h1>
         <p class="mt-1 text-sm text-gray-500">{{ total }} {{ total === 1 ? 'ride' : 'rides' }}</p>
@@ -346,14 +347,14 @@
       />
     </div>
 
-    <!-- Rides list, with the create wizard as a side pane on desktop / full-screen
-         overlay on mobile. When the pane is open, the list shrinks to make room. -->
-    <div class="lg:flex lg:items-start lg:gap-6">
-      <div :class="isCreateOpen ? 'min-w-0 lg:flex-1' : 'w-full'">
-        <!-- Toolbar: search keeps the full row width; the filter controls group
-             and wrap together beside it on wide screens instead of each stacking
-             into a tall full-width column. -->
-        <div class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+    <!-- Rides list + create pane. Bounded to the viewport: the list region scrolls
+         internally under a pinned pagination footer, so the page itself never
+         scrolls. Pane is a side column on desktop / full-screen overlay on mobile. -->
+    <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <!-- Toolbar: search keeps the row width; filter controls group and wrap
+             beside it on wide screens instead of stacking into a tall column. -->
+        <div class="mb-3 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center">
           <UInput
             v-model="search"
             icon="i-lucide-search"
@@ -436,106 +437,132 @@
           </div>
         </div>
 
-        <!-- Desktop (lg+): the full table. Below lg it would overflow sideways, so
-         it's hidden in favour of the ride cards below. -->
-        <UTable
-          :data="rides"
-          :columns="columns"
-          :loading="status === 'pending'"
-          class="hidden w-full cursor-pointer lg:block"
-          @select="onSelect"
-        >
-          <template #empty-state>
-            <div class="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+        <!-- Scroll region: table (desktop) / cards (mobile) scroll here, beneath
+             the pinned pagination footer below. -->
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <!-- Desktop (lg+): the full table with a sticky header. Below lg it would
+               overflow sideways, so the ride cards render instead. -->
+          <UTable
+            :data="rides"
+            :columns="columns"
+            :loading="status === 'pending'"
+            sticky
+            class="hidden w-full cursor-pointer lg:block"
+            @select="onSelect"
+          >
+            <template #empty-state>
+              <div
+                class="flex flex-col items-center justify-center py-12 text-center text-gray-500"
+              >
+                <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+                <p class="font-medium">No rides found</p>
+                <p class="text-sm">Try adjusting your search or filters</p>
+              </div>
+            </template>
+          </UTable>
+
+          <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
+         same navigation target — only the presentation differs. -->
+          <div class="lg:hidden">
+            <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
+            </div>
+
+            <div
+              v-else-if="rides.length === 0"
+              class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-16 text-center text-gray-500 dark:border-gray-700"
+            >
               <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
               <p class="font-medium">No rides found</p>
               <p class="text-sm">Try adjusting your search or filters</p>
             </div>
-          </template>
-        </UTable>
 
-        <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
-         same navigation target — only the presentation differs. -->
-        <div class="lg:hidden">
-          <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
-          </div>
-
-          <div
-            v-else-if="rides.length === 0"
-            class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-16 text-center text-gray-500 dark:border-gray-700"
-          >
-            <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
-            <p class="font-medium">No rides found</p>
-            <p class="text-sm">Try adjusting your search or filters</p>
-          </div>
-
-          <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <NuxtLink
-              v-for="ride in rides"
-              :key="ride.id"
-              :to="`/rides/${ride.id}`"
-              class="focus-visible:ring-primary block rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 focus:outline-none focus-visible:ring-2 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
-            >
-              <div class="mb-2 flex items-center justify-between gap-2">
-                <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
-                  {{ ride.status }}
-                </UBadge>
-                <span class="text-xs font-medium text-gray-500">
-                  {{
-                    formatDateTime(ride.scheduledTime, {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  }}
-                </span>
-              </div>
-
-              <p class="font-semibold text-gray-900 dark:text-white">
-                {{ ride.client?.user?.name }}
-              </p>
-
-              <div class="mt-3 space-y-1.5">
-                <div class="flex items-start gap-2">
-                  <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
-                  <span class="text-sm text-gray-600 dark:text-gray-300">{{
-                    ride.pickupDisplay
-                  }}</span>
-                </div>
-                <div class="flex items-start gap-2">
-                  <UIcon name="i-lucide-flag" class="text-error mt-0.5 size-4 shrink-0" />
-                  <span class="text-sm text-gray-600 dark:text-gray-300">{{
-                    ride.dropoffDisplay
-                  }}</span>
-                </div>
-              </div>
-
-              <div
-                class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800"
+            <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <NuxtLink
+                v-for="ride in rides"
+                :key="ride.id"
+                :to="`/rides/${ride.id}`"
+                class="focus-visible:ring-primary block rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 focus:outline-none focus-visible:ring-2 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
               >
-                <span
-                  v-if="ride.volunteer?.user?.name"
-                  class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+                <div class="mb-2 flex items-center justify-between gap-2">
+                  <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
+                    {{ ride.status }}
+                  </UBadge>
+                  <span class="text-xs font-medium text-gray-500">
+                    {{
+                      formatDateTime(ride.scheduledTime, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    }}
+                  </span>
+                </div>
+
+                <p class="font-semibold text-gray-900 dark:text-white">
+                  {{ ride.client?.user?.name }}
+                </p>
+
+                <div class="mt-3 space-y-1.5">
+                  <div class="flex items-start gap-2">
+                    <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
+                    <span class="text-sm text-gray-600 dark:text-gray-300">{{
+                      ride.pickupDisplay
+                    }}</span>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <UIcon name="i-lucide-flag" class="text-error mt-0.5 size-4 shrink-0" />
+                    <span class="text-sm text-gray-600 dark:text-gray-300">{{
+                      ride.dropoffDisplay
+                    }}</span>
+                  </div>
+                </div>
+
+                <div
+                  class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800"
                 >
                   <span
-                    class="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                    v-if="ride.volunteer?.user?.name"
+                    class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
                   >
-                    {{ initials(ride.volunteer.user.name) }}
+                    <span
+                      class="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                    >
+                      {{ initials(ride.volunteer.user.name) }}
+                    </span>
+                    {{ ride.volunteer.user.name }}
                   </span>
-                  {{ ride.volunteer.user.name }}
-                </span>
-                <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
-                <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
-              </div>
-            </NuxtLink>
+                  <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
+                  <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
+                </div>
+              </NuxtLink>
+            </div>
           </div>
         </div>
 
-        <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
-          <UPagination v-model:page="page" :total="total" :items-per-page="PAGE_SIZE" />
+        <!-- Pinned pagination footer: rows-per-page selector + page nav; stays put
+             while the rows scroll under it. -->
+        <div
+          class="mt-3 flex shrink-0 items-center justify-between gap-3 border-t border-gray-200 pt-3 dark:border-gray-800"
+        >
+          <USelect
+            v-model="pageSize"
+            :items="PAGE_SIZE_OPTIONS.map((n) => ({ label: `${n} / page`, value: n }))"
+            size="sm"
+            class="w-28"
+          />
+          <UPagination
+            v-if="total > Number(pageSize)"
+            v-model:page="page"
+            :total="total"
+            :items-per-page="Number(pageSize)"
+            size="sm"
+          />
+          <span v-else class="text-xs text-gray-500"
+            >{{ total }} {{ total === 1 ? 'ride' : 'rides' }}</span
+          >
         </div>
       </div>
 
@@ -543,7 +570,7 @@
            overlay below lg. The RideCreatePanel wizard is the same either way. -->
       <div
         v-if="isCreateOpen"
-        class="max-lg:fixed max-lg:inset-0 max-lg:z-50 lg:sticky lg:top-6 lg:h-[calc(100vh-8rem)] lg:w-[400px] lg:flex-none lg:self-start"
+        class="max-lg:fixed max-lg:inset-0 max-lg:z-50 lg:h-full lg:w-[400px] lg:flex-none"
       >
         <RideCreatePanel
           :clients="clients"
