@@ -134,10 +134,39 @@
       : [...selectedStatuses.value, value]
   }
 
+  // Live "today" key (YYYY-MM-DD in the app timezone) used to mark a date-range
+  // endpoint that falls on today. Kept reactive so the "(today)" marker appears
+  // and — crucially — disappears when the day rolls over while the page is left
+  // open. It's a client clock concern, so no server round-trip is needed; empty
+  // on the server so nothing stale renders during SSR.
+  const todayKey = ref('')
+  function currentDayKey() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: APP_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+  }
+  let dayTimer: ReturnType<typeof setInterval> | undefined
+  onMounted(() => {
+    todayKey.value = currentDayKey()
+    // Re-check each minute; that's imperceptibly close to the midnight edge and
+    // far cheaper than any push mechanism for a once-a-day change.
+    dayTimer = setInterval(() => {
+      const key = currentDayKey()
+      if (key !== todayKey.value) todayKey.value = key
+    }, 60_000)
+  })
+  onUnmounted(() => {
+    if (dayTimer) clearInterval(dayTimer)
+  })
+
   // Human-readable summary of the (transient, unsaved) date-range filter, shown
   // on the popover trigger — "All dates" when unset. Formats the YYYY-MM-DD as a
-  // local date so the app timezone can't shift it a day; only renders after a
-  // client-side pick, so there's no SSR/hydration concern.
+  // local date so the app timezone can't shift it a day, and marks an endpoint
+  // that is today with "(today)". Only renders after a client-side pick, so
+  // there's no SSR/hydration concern.
   const dateRangeLabel = computed(() => {
     const fmt = (s: string) => {
       const [y, m, d] = s.split('-').map(Number)
@@ -147,9 +176,11 @@
         year: 'numeric',
       })
     }
-    if (startDate.value && endDate.value) return `${fmt(startDate.value)} – ${fmt(endDate.value)}`
-    if (startDate.value) return `From ${fmt(startDate.value)}`
-    if (endDate.value) return `Until ${fmt(endDate.value)}`
+    const withToday = (s: string) => `${fmt(s)}${s === todayKey.value ? ' (today)' : ''}`
+    if (startDate.value && endDate.value)
+      return `${withToday(startDate.value)} – ${withToday(endDate.value)}`
+    if (startDate.value) return `From ${withToday(startDate.value)}`
+    if (endDate.value) return `Until ${withToday(endDate.value)}`
     return 'All dates'
   })
 
