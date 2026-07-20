@@ -557,8 +557,13 @@
           >
             <span
               v-if="ride.volunteer?.user?.name"
-              class="text-sm text-gray-600 dark:text-gray-300"
+              class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
             >
+              <span
+                class="flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+              >
+                {{ initials(ride.volunteer.user.name) }}
+              </span>
               {{ ride.volunteer.user.name }}
             </span>
             <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
