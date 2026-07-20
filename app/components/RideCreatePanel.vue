@@ -69,11 +69,36 @@
   const addressComplete = (a: { street: string; city: string; state: string; zip: string }) =>
     !!(a.street?.trim() && a.city?.trim() && a.state?.trim() && a.zip?.trim())
 
+  const normalizeAddress = (a: { street: string; city: string; state: string; zip: string }) =>
+    [a.street, a.city, a.state, a.zip].map((s) => (s || '').trim().toLowerCase()).join('|')
+
+  // Pickup and dropoff must differ — a ride to the same place makes no sense.
+  const sameAddress = computed(
+    () =>
+      addressComplete(state.pickup) &&
+      addressComplete(state.dropoff) &&
+      normalizeAddress(state.pickup) === normalizeAddress(state.dropoff)
+  )
+
+  // The volunteer picks the client up before the appointment, so a pickup time
+  // after it is invalid.
+  const pickupAfterAppointment = computed(
+    () =>
+      !!state.pickupTime &&
+      !!state.scheduledTime &&
+      new Date(state.pickupTime) > new Date(state.scheduledTime)
+  )
+
   // Whether the current step is complete enough to advance.
   const canContinue = computed(() => {
     if (step.value === 1)
-      return !!clientId.value && addressComplete(state.pickup) && addressComplete(state.dropoff)
-    if (step.value === 2) return !!state.scheduledTime
+      return (
+        !!clientId.value &&
+        addressComplete(state.pickup) &&
+        addressComplete(state.dropoff) &&
+        !sameAddress.value
+      )
+    if (step.value === 2) return !!state.scheduledTime && !pickupAfterAppointment.value
     return true
   })
 
@@ -207,6 +232,10 @@
         </div>
         <AddressField v-model="state.pickup" label="Pickup" :hint="pickupHint" />
         <AddressField v-model="state.dropoff" label="Dropoff" />
+        <p v-if="sameAddress" class="text-error flex items-center gap-1.5 text-xs">
+          <UIcon name="i-lucide-circle-alert" class="size-3.5 shrink-0" />
+          Pickup and dropoff can't be the same address.
+        </p>
       </div>
 
       <!-- Step 2: Schedule & details -->
@@ -222,6 +251,13 @@
             Pickup time <span class="font-normal text-gray-400">(optional)</span>
           </label>
           <UInput v-model="state.pickupTime" type="datetime-local" class="w-full" />
+          <p
+            v-if="pickupAfterAppointment"
+            class="text-error mt-1.5 flex items-center gap-1.5 text-xs"
+          >
+            <UIcon name="i-lucide-circle-alert" class="size-3.5 shrink-0" />
+            Pickup time must be before the appointment.
+          </p>
         </div>
         <div>
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -239,7 +275,13 @@
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Notes <span class="font-normal text-gray-400">(optional)</span>
           </label>
-          <UTextarea v-model="state.notes" placeholder="Additional instructions…" class="w-full" />
+          <UTextarea
+            v-model="state.notes"
+            :rows="4"
+            autoresize
+            placeholder="Additional instructions…"
+            class="w-full"
+          />
         </div>
       </div>
 
@@ -288,7 +330,9 @@
           </div>
           <div v-if="state.notes" class="p-3">
             <dt class="mb-1 text-sm text-gray-500">Notes</dt>
-            <dd class="text-sm">{{ state.notes }}</dd>
+            <dd class="text-sm [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
+              {{ state.notes }}
+            </dd>
           </div>
         </dl>
       </div>
