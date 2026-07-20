@@ -4,9 +4,12 @@
   import * as z from 'zod'
   import { authClient } from '../../utils/auth-client'
   import {
-    BASE_FILTER_OPTIONS,
-    DEFAULT_EXCLUDED_FILTERS,
-    sanitizeSavedFilters,
+    RIDE_STATUS_OPTIONS,
+    DEFAULT_RIDE_STATUSES,
+    sanitizeStatuses,
+    buildRidesInclude,
+    legacyCookieToStatuses,
+    type RideStatus,
   } from '../../utils/rideFilters'
 
   const UBadge = resolveComponent('UBadge')
@@ -22,18 +25,26 @@
   const { data: volunteers } = await useFetch('/api/get/volunteers/options')
 
   const search = ref('')
-  const savedSort = useCookie<string>('ride-sort', { default: () => 'desc' })
-  const sort = ref(savedSort.value)
 
-  watch(sort, (newVal) => {
-    savedSort.value = newVal
-  })
+  // --- Cross-device preferences (DB-backed filter preference) ---
+  // The list filter/sort used to live in browser cookies. It now lives per-user
+  // in the DB (GET/PUT /api/*/preferences) so the same view follows the user
+  // across devices. Seed the controls from the saved preference, falling back to
+  // sensible defaults when the user has never saved one.
+  const { data: prefs } = await useFetch('/api/get/preferences')
+
+  const selectedStatuses = ref<string[]>(
+    prefs.value?.rideStatusFilter != null
+      ? sanitizeStatuses(prefs.value.rideStatusFilter)
+      : [...DEFAULT_RIDE_STATUSES]
+  )
+  const sort = ref<string>(prefs.value?.rideSort ?? 'desc')
+  const assignedToMe = ref<boolean>(prefs.value?.rideAssignedToMeOnly ?? false)
 
   // --- Server-side pagination (issue #13) ---
-  // The rides list used to load the entire table and filter it client-side.
-  // Filtering, sorting and pagination now all happen on the server, so the
-  // table binds directly to the returned page. Debounce search so typing
-  // doesn't fire a request per keystroke.
+  // Filtering, sorting and pagination all happen on the server so the table
+  // binds directly to the returned page. Debounce search so typing doesn't fire
+  // a request per keystroke.
   const PAGE_SIZE = 20
   const page = ref(1)
   const debouncedSearch = ref('')
@@ -44,38 +55,11 @@
   const startDate = ref('')
   const endDate = ref('')
 
-  // Persisted State
-  const savedActiveFilters = useCookie<{ label: string; value: string }[]>('ride-active-filters', {
-    default: () => [],
-  })
-  const savedExcludedFilters = useCookie<{ label: string; value: string }[]>(
-    'ride-excluded-filters',
-    {
-      default: () => [...DEFAULT_EXCLUDED_FILTERS], // Default exclude (see issue #22)
-    }
-  )
-
-  // All values the UI can actually toggle. Includes `assign:ME` because it is a
-  // valid (volunteer-only) filter; base status options are always valid. Any
-  // saved value outside this set (e.g. the stale `status:CANCELLED`) is stripped
-  // on load so existing users aren't stuck with an un-toggleable filter (#22).
-  const knownFilterValues = [...BASE_FILTER_OPTIONS.map((o) => o.value), 'assign:ME']
-
-  const activeFilters = ref<{ label: string; value: string }[]>(
-    sanitizeSavedFilters(savedActiveFilters.value, knownFilterValues)
-  )
-  const excludedFilters = ref<{ label: string; value: string }[]>(
-    sanitizeSavedFilters(savedExcludedFilters.value, knownFilterValues)
-  )
-
-  // Include/exclude filter chips are sent to the backend as comma-separated
-  // values (e.g. "status:CREATED,assign:ME"); the server applies them so they
-  // compose with pagination instead of only filtering the current page (#13).
+  // Selected statuses (+ the volunteer-only "assigned to me" toggle) become the
+  // server `include` param so filtering composes with pagination (#13). There is
+  // no exclude param now — an empty selection means "all statuses".
   const includeParam = computed(() =>
-    activeFilters.value.map((f) => f.value).join(',')
-  )
-  const excludeParam = computed(() =>
-    excludedFilters.value.map((f) => f.value).join(',')
+    buildRidesInclude(selectedStatuses.value as RideStatus[], !isAdmin.value && assignedToMe.value)
   )
 
   // useFetch watches these reactive query refs and refetches automatically, so
@@ -92,8 +76,7 @@
       search: computed(() => debouncedSearch.value || undefined),
       startDate: computed(() => startDate.value || undefined),
       endDate: computed(() => endDate.value || undefined),
-      include: computed(() => includeParam.value || undefined),
-      exclude: computed(() => excludeParam.value || undefined),
+      include: includeParam,
     },
   })
 
@@ -102,35 +85,109 @@
 
   // Any filter/search/sort change should return to the first page so results
   // aren't hidden on a page that no longer exists.
-  watch([debouncedSearch, startDate, endDate, includeParam, excludeParam, sort], () => {
+  watch([debouncedSearch, startDate, endDate, includeParam, sort], () => {
     page.value = 1
   })
 
-  // Sync state back to cookies
-  watch(
-    activeFilters,
-    (newVal) => {
-      savedActiveFilters.value = newVal
-    },
-    { deep: true }
-  )
-  watch(
-    excludedFilters,
-    (newVal) => {
-      savedExcludedFilters.value = newVal
-    },
-    { deep: true }
-  )
+  // Persist filter/sort changes to the DB, debounced so a burst of toggles
+  // collapses into one write. The watch never fires on the initial seed — only
+  // on a real user change.
+  const savePreferences = debounce(() => {
+    $fetch('/api/put/preferences', {
+      method: 'PUT',
+      body: {
+        rideStatusFilter: sanitizeStatuses(selectedStatuses.value),
+        rideSort: sort.value,
+        rideAssignedToMeOnly: !isAdmin.value && assignedToMe.value,
+      },
+    }).catch((err) => console.error('Failed to save preferences', err))
+  }, 400)
+  watch([selectedStatuses, sort, assignedToMe], () => savePreferences(), { deep: true })
+
+  // One-time migration off the old cookie model: if the user has no saved DB
+  // preference yet but a legacy cookie exists, convert it, persist once, and
+  // clear the cookies so the DB becomes the single source of truth.
+  const legacyActive = useCookie<unknown>('ride-active-filters')
+  const legacyExcluded = useCookie<unknown>('ride-excluded-filters')
+  const legacySort = useCookie<string | null>('ride-sort')
+  onMounted(() => {
+    const prefUnset =
+      !prefs.value ||
+      (prefs.value.rideStatusFilter == null &&
+        prefs.value.rideSort == null &&
+        !prefs.value.rideAssignedToMeOnly)
+    const hasLegacy = !!(legacyActive.value || legacyExcluded.value || legacySort.value)
+    if (!prefUnset || !hasLegacy) return
+    selectedStatuses.value = legacyCookieToStatuses(legacyActive.value, legacyExcluded.value)
+    if (legacySort.value === 'asc' || legacySort.value === 'desc') sort.value = legacySort.value
+    savePreferences()
+    legacyActive.value = null
+    legacyExcluded.value = null
+    legacySort.value = null
+  })
 
   const isCreateModalOpen = ref(false)
 
-  const filterOptions = computed(() => {
-    const options = [...BASE_FILTER_OPTIONS]
-    if (!isAdmin.value) {
-      options.push({ label: 'Assigned to Me', value: 'assign:ME' })
-    }
-    return options
+  function toggleStatus(value: string) {
+    selectedStatuses.value = selectedStatuses.value.includes(value)
+      ? selectedStatuses.value.filter((s) => s !== value)
+      : [...selectedStatuses.value, value]
+  }
+
+  // Live "today" key (YYYY-MM-DD in the app timezone) used to mark a date-range
+  // endpoint that falls on today. Kept reactive so the "(today)" marker appears
+  // and — crucially — disappears when the day rolls over while the page is left
+  // open. It's a client clock concern, so no server round-trip is needed; empty
+  // on the server so nothing stale renders during SSR.
+  const todayKey = ref('')
+  function currentDayKey() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: APP_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+  }
+  let dayTimer: ReturnType<typeof setInterval> | undefined
+  onMounted(() => {
+    todayKey.value = currentDayKey()
+    // Re-check each minute; that's imperceptibly close to the midnight edge and
+    // far cheaper than any push mechanism for a once-a-day change.
+    dayTimer = setInterval(() => {
+      const key = currentDayKey()
+      if (key !== todayKey.value) todayKey.value = key
+    }, 60_000)
   })
+  onUnmounted(() => {
+    if (dayTimer) clearInterval(dayTimer)
+  })
+
+  // Human-readable summary of the (transient, unsaved) date-range filter, shown
+  // on the popover trigger — "All dates" when unset. Formats the YYYY-MM-DD as a
+  // local date so the app timezone can't shift it a day, and marks an endpoint
+  // that is today with "(today)". Only renders after a client-side pick, so
+  // there's no SSR/hydration concern.
+  const dateRangeLabel = computed(() => {
+    const fmt = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number)
+      return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    }
+    const withToday = (s: string) => `${fmt(s)}${s === todayKey.value ? ' (today)' : ''}`
+    if (startDate.value && endDate.value)
+      return `${withToday(startDate.value)} – ${withToday(endDate.value)}`
+    if (startDate.value) return `From ${withToday(startDate.value)}`
+    if (endDate.value) return `Until ${withToday(endDate.value)}`
+    return 'All dates'
+  })
+
+  function clearDateRange() {
+    startDate.value = ''
+    endDate.value = ''
+  }
 
   // --- Schema ---
   const addressSchema = z.object({
@@ -461,38 +518,75 @@
         placeholder="Search rides..."
         class="w-full lg:max-w-xs lg:flex-1"
       />
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Status filter: toggle which statuses to show. Selecting none shows
+             all. The active chip takes its status' badge colour. -->
+        <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
+          <UButton
+            v-for="opt in RIDE_STATUS_OPTIONS"
+            :key="opt.value"
+            :label="opt.label"
+            size="sm"
+            :color="selectedStatuses.includes(opt.value) ? statusColor(opt.value) : 'neutral'"
+            :variant="selectedStatuses.includes(opt.value) ? 'subtle' : 'ghost'"
+            :aria-pressed="selectedStatuses.includes(opt.value)"
+            @click="toggleStatus(opt.value)"
+          />
+          <UButton
+            v-if="!isAdmin"
+            label="Assigned to me"
+            icon="i-lucide-user-check"
+            size="sm"
+            :color="assignedToMe ? 'primary' : 'neutral'"
+            :variant="assignedToMe ? 'subtle' : 'ghost'"
+            :aria-pressed="assignedToMe"
+            @click="assignedToMe = !assignedToMe"
+          />
+        </div>
+
         <USelect
           v-model="sort"
+          size="sm"
           :items="[
             { label: 'Oldest First', value: 'asc' },
             { label: 'Newest First', value: 'desc' },
           ]"
           class="w-full sm:w-40"
         />
-        <USelectMenu
-          v-model="activeFilters"
-          :items="filterOptions"
-          multiple
-          :searchable="false"
-          :ui="{ input: 'hidden' }"
-          placeholder="Include status"
-          class="w-full sm:w-52"
-        />
-        <USelectMenu
-          v-model="excludedFilters"
-          :items="filterOptions"
-          multiple
-          :searchable="false"
-          :ui="{ input: 'hidden' }"
-          placeholder="Exclude status"
-          class="w-full sm:w-52"
-        />
-        <div class="flex flex-1 items-center gap-2">
-          <UInput v-model="startDate" type="date" class="w-full sm:w-auto" />
-          <span class="text-gray-400">–</span>
-          <UInput v-model="endDate" type="date" class="w-full sm:w-auto" />
-        </div>
+
+        <!-- Date range: one control reading "All dates" when unset; opens the
+             From/To pickers in a popover. This filter is transient (per-visit),
+             not persisted like status/sort. -->
+        <UPopover>
+          <UButton
+            icon="i-lucide-calendar"
+            :label="dateRangeLabel"
+            size="sm"
+            color="neutral"
+            variant="outline"
+            :class="{ 'text-primary font-medium': startDate || endDate }"
+          />
+          <template #content>
+            <div class="w-72 max-w-[calc(100vw-2rem)] space-y-3 p-3">
+              <UFormField label="From">
+                <UInput v-model="startDate" type="date" class="w-full" />
+              </UFormField>
+              <UFormField label="To">
+                <UInput v-model="endDate" type="date" class="w-full" />
+              </UFormField>
+              <div class="flex justify-end">
+                <UButton
+                  label="Clear"
+                  size="sm"
+                  color="neutral"
+                  variant="ghost"
+                  :disabled="!startDate && !endDate"
+                  @click="clearDateRange"
+                />
+              </div>
+            </div>
+          </template>
+        </UPopover>
       </div>
     </div>
 
@@ -593,11 +687,7 @@
     </div>
 
     <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
-      <UPagination
-        v-model:page="page"
-        :total="total"
-        :items-per-page="PAGE_SIZE"
-      />
+      <UPagination v-model:page="page" :total="total" :items-per-page="PAGE_SIZE" />
     </div>
 
     <!-- Create Ride Modal -->

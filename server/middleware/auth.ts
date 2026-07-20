@@ -18,6 +18,10 @@ const VOLUNTEER_WRITE_ALLOW = [
   /^\/api\/post\/rides\/[^/]+\/unsignup$/,
   /^\/api\/post\/rides\/[^/]+\/complete$/,
   /^\/api\/put\/volunteers\/bySession(\/|$)/,
+  // Saving your own UI preferences is a self-service write. The handler scopes
+  // strictly to the session user (no id in the path), so there's nothing to
+  // escalate — a volunteer can only ever write their own preference row.
+  /^\/api\/put\/preferences(\/|$)/,
 ]
 
 function isWrite(method: string) {

@@ -1,3 +1,39 @@
-@import "tailwindcss";
-@import "@nuxt/ui";
+@import 'tailwindcss';
+@import '@nuxt/ui';
 
+/* --- Scrollbar ---
+   The platform default is a chunky, high-contrast track that reads as visual
+   noise over the dark UI. Desktop gets a slim, subtle bar; mobile hides it
+   entirely (touch / overlay scrolling still works) for a cleaner app feel.
+   Breakpoint matches the app's `lg` table<->cards switch (1024px). */
+@media (min-width: 1024px) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(120, 128, 145, 0.4) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(120, 128, 145, 0.4);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(120, 128, 145, 0.6);
+  }
+}
+
+@media (max-width: 1023.98px) {
+  * {
+    scrollbar-width: none;
+  }
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
