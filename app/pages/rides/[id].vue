@@ -521,12 +521,16 @@
         </div>
       </div>
 
-      <!-- Mobile sticky action bar: one filled primary action (thumb-reachable)
+      <!-- Spacer so page content isn't hidden behind the fixed mobile bar. -->
+      <div v-if="primaryAction" aria-hidden="true" class="h-24 lg:hidden"></div>
+
+      <!-- Mobile action bar: docked flush to the bottom edge — full width, only
+           the top corners rounded. One filled primary action (thumb-reachable)
            plus any secondary actions as icon buttons. Hidden on lg+, where the
            actions live inline in the header instead. -->
       <div
         v-if="primaryAction"
-        class="sticky bottom-4 z-10 mt-6 flex items-center gap-2 rounded-xl border border-gray-200 bg-white/90 p-2 shadow-lg backdrop-blur lg:hidden dark:border-gray-700 dark:bg-gray-900/90"
+        class="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 rounded-t-xl border-t border-gray-200 bg-white/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden dark:border-gray-700 dark:bg-gray-900/95"
       >
         <UButton
           v-for="a in secondaryActions"
