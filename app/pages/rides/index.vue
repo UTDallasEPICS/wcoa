@@ -10,6 +10,7 @@
   } from '../../utils/rideFilters'
 
   const UBadge = resolveComponent('UBadge')
+  const UIcon = resolveComponent('UIcon')
 
   const { data: session } = await authClient.useSession(useFetch)
   const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
@@ -272,6 +273,17 @@
     return map[status] || 'neutral'
   }
 
+  // Initials for the volunteer avatar chip (first + last word), shared shape
+  // with the mobile cards' status treatment.
+  function initials(name?: string | null): string {
+    if (!name) return '?'
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    if (!parts.length) return '?'
+    const first = parts[0][0] ?? ''
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : ''
+    return (first + last).toUpperCase() || '?'
+  }
+
   const columns: TableColumn<any>[] = [
     {
       accessorKey: 'status',
@@ -288,40 +300,87 @@
         ),
     },
     {
-      id: 'volunteer',
-      header: 'Volunteer',
+      id: 'client',
+      header: 'Client',
       cell: ({ row }) => {
-        return (
-          row.original.volunteer?.user?.name ||
-          h('span', { class: 'text-gray-400 italic' }, 'Unassigned')
-        )
+        const phone = formatPhoneNumber(row.original.client?.user?.phone)
+        return h('div', { class: 'leading-tight' }, [
+          h(
+            'div',
+            { class: 'font-medium text-gray-900 dark:text-white' },
+            row.original.client?.user?.name
+          ),
+          phone ? h('div', { class: 'text-xs text-gray-500' }, phone) : null,
+        ])
+      },
+    },
+    {
+      id: 'route',
+      header: 'Route',
+      // Pickup and dropoff collapse into one cell so origin -> destination reads
+      // at a glance instead of two separate, truncated address columns.
+      cell: ({ row }) => {
+        const leg = (icon: string, iconClass: string, text: string) =>
+          h('div', { class: 'flex items-center gap-2' }, [
+            h(UIcon, { name: icon, class: `${iconClass} size-3.5 shrink-0` }),
+            h(
+              'span',
+              { class: 'max-w-[240px] truncate text-gray-600 dark:text-gray-300', title: text },
+              text
+            ),
+          ])
+        return h('div', { class: 'flex flex-col gap-1 text-sm' }, [
+          leg('i-lucide-map-pin', 'text-primary', row.original.pickupDisplay),
+          leg('i-lucide-flag', 'text-error', row.original.dropoffDisplay),
+        ])
       },
     },
     {
       accessorKey: 'scheduledTime',
-      header: 'Date',
+      header: 'When',
       cell: ({ row }) => {
         // Pinned locale + timezone so SSR and client agree (issue #98).
-        return formatDateTime(row.getValue('scheduledTime'), {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
+        const t = row.getValue('scheduledTime') as string
+        return h('div', { class: 'leading-tight' }, [
+          h(
+            'div',
+            { class: 'font-medium text-gray-900 dark:text-white' },
+            formatDateTime(t, { weekday: 'short', month: 'short', day: 'numeric' })
+          ),
+          h(
+            'div',
+            { class: 'text-xs text-gray-500' },
+            formatDateTime(t, { hour: '2-digit', minute: '2-digit' })
+          ),
+        ])
       },
     },
     {
-      accessorKey: 'client.user.name',
-      header: 'Client',
+      id: 'volunteer',
+      header: 'Volunteer',
+      cell: ({ row }) => {
+        const name = row.original.volunteer?.user?.name
+        if (!name) return h('span', { class: 'text-sm text-gray-400 italic' }, 'Unassigned')
+        return h('div', { class: 'flex items-center gap-2' }, [
+          h(
+            'span',
+            {
+              class:
+                'flex size-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+            },
+            initials(name)
+          ),
+          h('span', { class: 'text-sm' }, name),
+        ])
+      },
     },
     {
-      accessorKey: 'pickupDisplay',
-      header: 'Pickup',
-    },
-    {
-      accessorKey: 'dropoffDisplay',
-      header: 'Dropoff',
+      id: 'chevron',
+      header: '',
+      cell: () =>
+        h('div', { class: 'flex justify-end' }, [
+          h(UIcon, { name: 'i-lucide-chevron-right', class: 'size-4 text-gray-400' }),
+        ]),
     },
   ]
 
