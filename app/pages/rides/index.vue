@@ -259,23 +259,33 @@
   // (issue #13) so they compose with pagination. The table binds directly to
   // the returned page (`rides`) — no client-side filtering pass.
 
+  // Status → badge color, shared by the desktop table and the mobile cards so
+  // the two breakpoints can never drift apart.
+  type StatusColor = 'info' | 'warning' | 'success' | 'error' | 'neutral'
+  function statusColor(status: string): StatusColor {
+    const map: Record<string, StatusColor> = {
+      CREATED: 'info',
+      ASSIGNED: 'warning',
+      COMPLETED: 'success',
+      CANCELLED: 'error',
+    }
+    return map[status] || 'neutral'
+  }
+
   const columns: TableColumn<any>[] = [
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => {
-        const color =
+      cell: ({ row }) =>
+        h(
+          UBadge,
           {
-            CREATED: 'info' as const,
-            ASSIGNED: 'warning' as const,
-            COMPLETED: 'success' as const,
-            CANCELLED: 'error' as const,
-          }[row.getValue('status') as string] || 'neutral'
-
-        return h(UBadge, { class: 'capitalize', variant: 'subtle', color }, () =>
-          row.getValue('status')
-        )
-      },
+            class: 'capitalize',
+            variant: 'subtle',
+            color: statusColor(row.getValue('status') as string),
+          },
+          () => row.getValue('status')
+        ),
     },
     {
       id: 'volunteer',
@@ -416,13 +426,88 @@
       </div>
     </div>
 
+    <!-- Desktop (lg+): the full table. Below lg it would overflow sideways, so
+         it's hidden in favour of the ride cards below. -->
     <UTable
       :data="rides"
       :columns="columns"
       :loading="status === 'pending'"
-      class="w-full cursor-pointer"
+      class="hidden w-full cursor-pointer lg:block"
       @select="onSelect"
     />
+
+    <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
+         same navigation target — only the presentation differs. -->
+    <div class="lg:hidden">
+      <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
+      </div>
+
+      <div
+        v-else-if="rides.length === 0"
+        class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-16 text-center text-gray-500 dark:border-gray-700"
+      >
+        <UIcon name="i-lucide-calendar-x" class="mb-2 size-8 text-gray-400" />
+        <p class="font-medium">No rides found</p>
+        <p class="text-sm">Try adjusting your search or filters</p>
+      </div>
+
+      <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <NuxtLink
+          v-for="ride in rides"
+          :key="ride.id"
+          :to="`/rides/${ride.id}`"
+          class="focus-visible:ring-primary block rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 focus:outline-none focus-visible:ring-2 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+        >
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <UBadge :color="statusColor(ride.status)" variant="subtle" class="capitalize">
+              {{ ride.status }}
+            </UBadge>
+            <span class="text-xs font-medium text-gray-500">
+              {{
+                formatDateTime(ride.scheduledTime, {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              }}
+            </span>
+          </div>
+
+          <p class="font-semibold text-gray-900 dark:text-white">
+            {{ ride.client?.user?.name }}
+          </p>
+
+          <div class="mt-3 space-y-1.5">
+            <div class="flex items-start gap-2">
+              <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{ ride.pickupDisplay }}</span>
+            </div>
+            <div class="flex items-start gap-2">
+              <UIcon name="i-lucide-flag" class="text-error mt-0.5 size-4 shrink-0" />
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{
+                ride.dropoffDisplay
+              }}</span>
+            </div>
+          </div>
+
+          <div
+            class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800"
+          >
+            <span
+              v-if="ride.volunteer?.user?.name"
+              class="text-sm text-gray-600 dark:text-gray-300"
+            >
+              {{ ride.volunteer.user.name }}
+            </span>
+            <span v-else class="text-sm text-gray-400 italic">Unassigned</span>
+            <UIcon name="i-lucide-chevron-right" class="size-4 text-gray-400" />
+          </div>
+        </NuxtLink>
+      </div>
+    </div>
 
     <div v-if="total > PAGE_SIZE" class="mt-4 flex justify-end">
       <UPagination
