@@ -86,12 +86,12 @@
 
 <template>
   <div
-    class="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+    class="relative h-80 w-full overflow-hidden rounded-lg border border-gray-200 lg:h-[520px] dark:border-gray-700"
   >
-    <div v-show="hasCoords && !failed" ref="container" class="absolute inset-0"></div>
+    <div v-show="hasCoords && !failed" ref="container" class="h-full w-full"></div>
     <div
       v-if="!hasCoords || failed"
-      class="flex h-full items-center justify-center bg-gray-100 p-4 text-center text-sm text-gray-400 dark:bg-gray-800"
+      class="absolute inset-0 flex items-center justify-center bg-gray-100 p-4 text-center text-sm text-gray-400 dark:bg-gray-800"
     >
       {{ failed ? 'Map could not be loaded.' : 'Map unavailable for these addresses.' }}
     </div>
