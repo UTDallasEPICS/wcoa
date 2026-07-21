@@ -29,6 +29,23 @@ export const APP_TIME_ZONE = 'America/Chicago'
 export const clockHour12 = ref<boolean | undefined>(undefined)
 
 /**
+ * Detect whether the browser's default locale uses a 12-hour clock. Client-only
+ * (call after mount). Note: Chrome/V8 report the locale's CLDR default here and
+ * do NOT reflect macOS's "24-Hour Time" force flag for en-US — which is why an
+ * explicit user preference can override this (see plugins/clock.client.ts).
+ * Defaults to 12h (true) if the environment can't report a cycle.
+ */
+export function detectHour12(): boolean {
+  try {
+    const cycle = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions()
+      .hourCycle
+    return cycle === 'h11' || cycle === 'h12'
+  } catch {
+    return true
+  }
+}
+
+/**
  * Format an instant in the app's fixed locale + timezone. Extra
  * `Intl.DateTimeFormatOptions` are merged in so each call site keeps its own
  * date/time style; only the locale and timezone are forced. The hour cycle

@@ -18,6 +18,7 @@ const prefSchema = z
     ridesPerPage: z.number().int().positive().max(100).optional(),
     ridesViewDesktop: z.enum(['table', 'cards']).optional(),
     ridesViewMobile: z.enum(['table', 'cards']).optional(),
+    clockFormat: z.enum(['auto', '12h', '24h']).optional(),
   })
   .strict()
 
@@ -39,6 +40,7 @@ export default defineEventHandler(async (event) => {
     ridesPerPage?: number
     ridesViewDesktop?: string
     ridesViewMobile?: string
+    clockFormat?: string
   } = {}
   if (body.rideStatusFilter !== undefined) {
     data.rideStatusFilter = Array.from(new Set(body.rideStatusFilter)).join(',')
@@ -50,6 +52,7 @@ export default defineEventHandler(async (event) => {
   if (body.ridesPerPage !== undefined) data.ridesPerPage = body.ridesPerPage
   if (body.ridesViewDesktop !== undefined) data.ridesViewDesktop = body.ridesViewDesktop
   if (body.ridesViewMobile !== undefined) data.ridesViewMobile = body.ridesViewMobile
+  if (body.clockFormat !== undefined) data.clockFormat = body.clockFormat
 
   const pref = await prisma.userPreference.upsert({
     where: { userId },
@@ -65,5 +68,6 @@ export default defineEventHandler(async (event) => {
     ridesPerPage: pref.ridesPerPage ?? null,
     ridesViewDesktop: pref.ridesViewDesktop ?? null,
     ridesViewMobile: pref.ridesViewMobile ?? null,
+    clockFormat: pref.clockFormat ?? null,
   }
 })

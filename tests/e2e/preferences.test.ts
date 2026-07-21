@@ -15,6 +15,7 @@ type Prefs = {
   ridesPerPage: number | null
   ridesViewDesktop: string | null
   ridesViewMobile: string | null
+  clockFormat: string | null
 }
 
 describe('user preferences API', () => {
@@ -27,6 +28,30 @@ describe('user preferences API', () => {
     expect(res.ridesPerPage).toBeNull()
     expect(res.ridesViewDesktop).toBeNull()
     expect(res.ridesViewMobile).toBeNull()
+    expect(res.clockFormat).toBeNull()
+  })
+
+  it('persists clockFormat (12h/24h override) and reads it back', async () => {
+    const cookie = await loginAs('alice@example.com')
+    const put = await $fetch<Prefs>('/api/put/preferences', {
+      method: 'PUT',
+      headers: { cookie },
+      body: { clockFormat: '24h' },
+    })
+    expect(put.clockFormat).toBe('24h')
+    const get = await $fetch<Prefs>('/api/get/preferences', { headers: { cookie } })
+    expect(get.clockFormat).toBe('24h')
+  })
+
+  it('rejects an invalid clockFormat with 400', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+    await expect(
+      $fetch('/api/put/preferences', {
+        method: 'PUT',
+        headers: { cookie },
+        body: { clockFormat: 'military' },
+      })
+    ).rejects.toMatchObject({ statusCode: 400 })
   })
 
   it('persists per-breakpoint view (ridesViewDesktop/Mobile) independently', async () => {

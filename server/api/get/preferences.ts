@@ -26,5 +26,6 @@ export default defineEventHandler(async (event) => {
     ridesPerPage: pref?.ridesPerPage ?? null,
     ridesViewDesktop: pref?.ridesViewDesktop ?? null,
     ridesViewMobile: pref?.ridesViewMobile ?? null,
+    clockFormat: pref?.clockFormat ?? null,
   }
 })

@@ -54,6 +54,23 @@
   const desktopView = ref<string>(prefs.value?.ridesViewDesktop ?? 'table')
   const mobileView = ref<string>(prefs.value?.ridesViewMobile ?? 'cards')
 
+  // Clock format for rendered times: 'auto' follows the browser's detected
+  // cycle; '12h'/'24h' force it. Needed because Chrome/V8 ignore macOS's
+  // force-24h flag for en-US, so auto-detection can't see that setting. Applied
+  // to the shared clockHour12 ref CLIENT-SIDE only (never during SSR, so the ref
+  // can't leak across requests and hydration stays clean).
+  const CLOCK_OPTIONS = [
+    { label: 'Auto', value: 'auto' },
+    { label: '12h', value: '12h' },
+    { label: '24h', value: '24h' },
+  ]
+  const clockFormat = ref<string>(prefs.value?.clockFormat ?? 'auto')
+  function applyClockFormat(fmt: string) {
+    clockHour12.value = fmt === '24h' ? false : fmt === '12h' ? true : detectHour12()
+  }
+  onMounted(() => applyClockFormat(clockFormat.value))
+  watch(clockFormat, (fmt) => applyClockFormat(fmt))
+
   // Visibility is pure CSS (max-lg = below 1024px, lg = 1024px+), driven by the
   // per-breakpoint preference, so both the table and cards stay in the DOM and
   // the right one shows at each width without any JS viewport detection.
@@ -143,11 +160,12 @@
         ridesPerPage: Number(pageSize.value),
         ridesViewDesktop: desktopView.value,
         ridesViewMobile: mobileView.value,
+        clockFormat: clockFormat.value,
       },
     }).catch((err) => console.error('Failed to save preferences', err))
   }, 400)
   watch(
-    [selectedStatuses, sort, assignedToMe, pageSize, desktopView, mobileView],
+    [selectedStatuses, sort, assignedToMe, pageSize, desktopView, mobileView, clockFormat],
     () => savePreferences(),
     { deep: true }
   )
@@ -506,6 +524,27 @@
                   :variant="currentView === 'cards' ? 'subtle' : 'ghost'"
                   aria-label="Card view"
                   @click="setView('cards')"
+                />
+              </div>
+            </ClientOnly>
+
+            <!-- Clock format: Auto follows the browser; 12h/24h force it. Needed
+                 because Chrome ignores macOS's force-24h flag for en-US. Saved
+                 per-user and applied app-wide. Client-only so SSR/hydration stay
+                 clean (times render 12h until the cycle is applied post-mount). -->
+            <ClientOnly>
+              <div
+                class="inline-flex items-center rounded-lg border border-gray-200 p-0.5 dark:border-gray-700"
+                aria-label="Time format"
+              >
+                <UButton
+                  v-for="opt in CLOCK_OPTIONS"
+                  :key="opt.value"
+                  :label="opt.label"
+                  size="sm"
+                  :color="clockFormat === opt.value ? 'primary' : 'neutral'"
+                  :variant="clockFormat === opt.value ? 'subtle' : 'ghost'"
+                  @click="clockFormat = opt.value"
                 />
               </div>
             </ClientOnly>
