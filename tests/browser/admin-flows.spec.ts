@@ -23,45 +23,56 @@ test('R-293: rides list renders seeded rows; search narrows them server-side', a
   await page.goto('/rides')
   await expect(page.getByText('Martha Jenkins').first()).toBeVisible()
 
-  const searchResponse = page.waitForResponse((r) => r.url().includes('/api/get/rides') && r.url().includes('search='))
-  await page.getByPlaceholder('Search...').fill('Sarah')
+  const searchResponse = page.waitForResponse(
+    (r) => r.url().includes('/api/get/rides') && r.url().includes('search=')
+  )
+  await page.getByPlaceholder('Search rides...').fill('Sarah')
   await searchResponse
   await expect(page.getByText('Sarah Connor').first()).toBeVisible()
   await expect(page.getByText('Martha Jenkins')).toHaveCount(0)
 })
 
-test('R-294/R-305: Create Ride modal — client select auto-fills pickup; create succeeds with a toast', async ({ page }) => {
+test('R-294/R-305: Create Ride wizard — client auto-fills pickup; 3-step create succeeds', async ({
+  page,
+}) => {
   await page.goto('/rides')
   await page.getByRole('button', { name: 'Create Ride' }).click()
 
+  // --- Step 1: Client & route ---
   await page.getByRole('combobox').first().click()
   await page.getByRole('option', { name: 'Martha Jenkins' }).click()
-  // Auto-fill (R-294): Martha's seeded home address lands in the pickup fields.
-  await expect(page.getByPlaceholder('Street Address').first()).toHaveValue(/1501 H Avenue/i)
+  // Auto-fill (R-294): Martha's seeded home address lands in the pickup summary.
+  await expect(page.getByText(/1501 H Avenue/i)).toBeVisible()
+  // Dropoff: search + pick a suggestion. The harness runs the geocoder offline
+  // (MAPS_OFFLINE=1), which returns one deterministic canned result.
+  await page.getByPlaceholder('Search for an address').fill('test address')
+  await page.getByRole('button', { name: /Test Address, Plano/ }).click()
+  await page.getByRole('button', { name: /Continue/ }).click()
 
-  await page.getByPlaceholder('Street Address').nth(1).fill('800 W Campbell Rd')
-  await page.getByPlaceholder('City').nth(1).fill('Richardson')
-  await page.getByPlaceholder('State').nth(1).fill('TX')
-  await page.getByPlaceholder('Zip').nth(1).fill('75080')
-  // Appointment Time is required — set the datetime-local field explicitly.
+  // --- Step 2: Schedule ---
   await page.locator('input[type="datetime-local"]').first().fill('2026-08-01T14:30')
   await page.locator('textarea').fill('browser-suite ride')
+  await page.getByRole('button', { name: /Continue/ }).click()
 
-  // Wait on the actual create request rather than a toast string (robust to
-  // copy changes); a 200 is the contract.
+  // --- Step 3: Review + create ---. Wait on the POST (robust to copy changes).
   const created = page.waitForResponse(
     (r) => r.url().includes('/api/post/rides') && r.request().method() === 'POST'
   )
-  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await page.getByRole('button', { name: /Create ride/ }).click()
   expect((await created).status()).toBe(200)
 
   // Persisted (not just optimistic UI):
   await expect
-    .poll(() => dbGet<{ notes: string }>(`SELECT notes FROM ride WHERE notes = 'browser-suite ride'`)?.notes)
+    .poll(
+      () =>
+        dbGet<{ notes: string }>(`SELECT notes FROM ride WHERE notes = 'browser-suite ride'`)?.notes
+    )
     .toBe('browser-suite ride')
 })
 
-test('R-296/R-297/R-298: ride detail — cancel confirm flow, Navigate deep-link, map fallback', async ({ page }) => {
+test('R-296/R-297/R-298: ride detail — cancel confirm flow, Navigate deep-link, map fallback', async ({
+  page,
+}) => {
   // Self-contained: cancel any CREATED, unassigned, non-archived seeded ride
   // (decoupled from other tests so run order / server reuse can't break it).
   const ride = dbGet<{ id: string }>(
@@ -72,10 +83,14 @@ test('R-296/R-297/R-298: ride detail — cancel confirm flow, Navigate deep-link
 
   // R-297: encoded Google Maps deep link
   const nav = page.getByRole('link', { name: /Navigate/ })
-  await expect(nav).toHaveAttribute('href', /google\.com\/maps\/dir\/\?api=1&origin=.+&destination=.+/)
+  await expect(nav).toHaveAttribute(
+    'href',
+    /google\.com\/maps\/dir\/\?api=1&origin=.+&destination=.+/
+  )
 
-  // R-298: with no embed key the map degrades to the friendly placeholder
-  await expect(page.getByText(/Map API Key missing/i)).toBeVisible()
+  // R-298: the MapLibre/OpenFreeMap map degrades to a friendly placeholder when
+  // coordinates aren't available (routing is offline in the harness).
+  await expect(page.getByText(/Map unavailable/i)).toBeVisible()
 
   // R-296: cancel with confirm modal → CANCELLED badge, cancel button gone
   await page.getByRole('button', { name: 'Cancel Ride' }).click()
@@ -89,7 +104,9 @@ test('R-296/R-297/R-298: ride detail — cancel confirm flow, Navigate deep-link
   expect(status?.status).toBe('CANCELLED')
 })
 
-test('R-300: people page — tabs render rosters; edit modal prefills every field', async ({ page }) => {
+test('R-300: people page — tabs render rosters; edit modal prefills every field', async ({
+  page,
+}) => {
   await page.goto('/people')
   await expect(page.getByText('bob@example.com')).toBeVisible()
 
@@ -109,12 +126,18 @@ test('R-300: people page — tabs render rosters; edit modal prefills every fiel
 
 test('R-302: notification templates page shows all five cards', async ({ page }) => {
   await page.goto('/admin/notifications')
-  for (const name of ['RIDE_ASSIGNED', 'RIDE_CANCELLED', 'RIDE_COMPLETED', 'RIDE_CREATED', 'RIDE_REMINDER']) {
+  for (const name of [
+    'RIDE_ASSIGNED',
+    'RIDE_CANCELLED',
+    'RIDE_COMPLETED',
+    'RIDE_CREATED',
+    'RIDE_REMINDER',
+  ]) {
     await expect(page.getByText(name, { exact: true })).toBeVisible()
   }
 })
 
-test('R-303: audit page renders the trail of this suite\'s own actions', async ({ page }) => {
+test("R-303: audit page renders the trail of this suite's own actions", async ({ page }) => {
   await page.goto('/admin/audit')
   await expect(page.getByRole('heading', { name: 'Audit Log' })).toBeVisible()
   // The cancel test above must have produced a RIDE_CANCELLED row.

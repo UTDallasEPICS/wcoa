@@ -34,6 +34,14 @@ model Ride {
   cachedDurationValue Int? // seconds
   estimatedAt         DateTime? // when the cache was last populated
 
+  // Geocoded pickup/dropoff coordinates, cached alongside the estimate so the
+  // map (MapLibre) can plot the route without re-geocoding. Invalidated with the
+  // estimate whenever pickupDisplay/dropoffDisplay changes.
+  cachedPickupLat  Float?
+  cachedPickupLng  Float?
+  cachedDropoffLat Float?
+  cachedDropoffLng Float?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

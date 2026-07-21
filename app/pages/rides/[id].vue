@@ -305,17 +305,18 @@
   )
   const secondaryActions = computed(() => actions.value.filter((a) => a !== primaryAction.value))
 
-  const mapUrl = computed(() => {
-    if (!ride.value) return ''
-    const origin = encodeURIComponent(ride.value.pickupDisplay)
-    const destination = encodeURIComponent(ride.value.dropoffDisplay)
-    // Issue #30: the PUBLIC key is correct here — the Maps Embed iframe runs in
-    // the browser and needs a client-visible key. It MUST be a DIFFERENT Google
-    // Cloud key from the server-only Directions key, HTTP-referrer-restricted
-    // and scoped to the Maps Embed API (owner action in Google Cloud Console).
-    const apiKey = useRuntimeConfig().public.googleMapsApiKey
-    return `https://www.google.com/maps/embed/v1/directions?key=${apiKey || ''}&origin=${origin}&destination=${destination}`
-  })
+  // Pickup/dropoff coordinates for the route map, taken from the (cached)
+  // estimate response (geocoded server-side via Photon). null until available.
+  const mapPickup = computed(() =>
+    estimate.value?.pickupLat != null && estimate.value?.pickupLng != null
+      ? { lat: estimate.value.pickupLat, lng: estimate.value.pickupLng }
+      : null
+  )
+  const mapDropoff = computed(() =>
+    estimate.value?.dropoffLat != null && estimate.value?.dropoffLng != null
+      ? { lat: estimate.value.dropoffLat, lng: estimate.value.dropoffLng }
+      : null
+  )
 
   // Universal maps directions deep-link: origin = pickup, destination = dropoff.
   // On a phone the OS hands this off to the native maps app; on desktop it
@@ -485,6 +486,13 @@
                   <p class="font-medium">{{ estimate.distance }}</p>
                 </div>
               </div>
+              <p
+                v-else-if="estimate?.error"
+                class="flex items-center gap-1.5 text-sm text-gray-500"
+              >
+                <UIcon name="i-lucide-info" class="size-4 shrink-0" />
+                {{ estimate.error }}
+              </p>
 
               <UButton
                 :to="navigateUrl"
@@ -499,23 +507,14 @@
                 data-testid="navigate-link"
               />
 
-              <div class="aspect-video w-full overflow-hidden rounded-lg border">
-                <iframe
-                  v-if="mapUrl && useRuntimeConfig().public.googleMapsApiKey"
-                  width="100%"
-                  height="100%"
-                  frameborder="0"
-                  style="border: 0"
-                  :src="mapUrl"
-                  allowfullscreen
-                ></iframe>
-                <div
-                  v-else
-                  class="flex h-full items-center justify-center bg-gray-100 text-gray-400 italic"
-                >
-                  Map API Key missing or invalid address
-                </div>
-              </div>
+              <ClientOnly>
+                <RideRouteMap :pickup="mapPickup" :dropoff="mapDropoff" />
+                <template #fallback>
+                  <div
+                    class="aspect-video w-full animate-pulse rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"
+                  ></div>
+                </template>
+              </ClientOnly>
             </div>
           </UCard>
         </div>
