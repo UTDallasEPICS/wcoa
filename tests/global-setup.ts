@@ -77,7 +77,7 @@ export default async function globalSetup() {
       // strict no-ops without this flag, which only the harness ever sets.
       TEST_HOOKS: '1',
       DISABLE_RATE_LIMIT: 'true',
-      // Maps are key-less open-source services now (Photon geocoding + OSRM
+      // Maps are key-less open-source services now (Nominatim geocoding + OSRM
       // routing). MAPS_OFFLINE=1 makes those helpers skip every outbound call so
       // the suite stays hermetic + deterministic: geocoding returns no results
       // and routing returns null, exactly like a real outage, with no network

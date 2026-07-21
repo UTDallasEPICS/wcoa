@@ -1,6 +1,10 @@
 // Open-source geocoding + routing helpers (no API key).
 //
-// Geocoding: Photon (photon.komoot.io), OpenStreetMap-based.
+// Geocoding: Nominatim (nominatim.openstreetmap.org), OpenStreetMap-based.
+//   We previously used Photon; it mis-ranked abbreviated street addresses (e.g.
+//   "6001 W Plano Pkwy" matched a house number onto the wrong street ~4mi away),
+//   which threw off both the autocomplete suggestions and the routed distance.
+//   Nominatim parses structured US addresses far more accurately.
 // Routing:   OSRM public demo (router.project-osrm.org).
 //
 // Both are best-effort public instances, so every call is wrapped to degrade
@@ -8,9 +12,23 @@
 // harness, tests/global-setup.ts) all outbound calls are skipped so the suite
 // stays hermetic and deterministic — geocoding yields no results and routing
 // yields null, exactly as a real outage would, without touching the network.
+//
+// Nominatim usage policy: send a real User-Agent and stay light (≤1 req/s). This
+// app's volume is tiny — a couple admins, a 300ms-debounced autocomplete, and
+// per-ride caching — so the public instance is fine. At heavy scale, self-host
+// Nominatim (Docker, no key/limit) or move to a hosted OSM geocoder.
 function offline(): boolean {
   return process.env.MAPS_OFFLINE === '1'
 }
+
+// Identify the app to Nominatim (policy requirement). Overridable so a deployment
+// can supply its own contact string.
+const NOMINATIM_UA =
+  process.env.NOMINATIM_USER_AGENT ?? 'wcoa-ride-app/1.0 (volunteer ride scheduling)'
+
+// Bias results toward the org's service area (DFW / North Texas) and restrict to
+// the US so an ambiguous name can't resolve to another country.
+const NOMINATIM_VIEWBOX = '-97.0,33.3,-96.5,32.8'
 
 export interface GeocodeResult {
   label: string
@@ -28,39 +46,78 @@ const OFFLINE_RESULT: GeocodeResult = {
   lon: -96.7,
 }
 
-export async function photonSearch(query: string, limit = 5): Promise<GeocodeResult[]> {
+interface NominatimResult {
+  lat: string
+  lon: string
+  name?: string
+  display_name?: string
+  address?: Record<string, string>
+}
+
+// Turn a US state name into its 2-letter code. Nominatim usually hands us the
+// ISO code directly (`ISO3166-2-lvl4` = "US-TX"); this is the fallback.
+const STATE_ABBR: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS',
+  missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV',
+  'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+  'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK',
+  oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT',
+  virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI',
+  wyoming: 'WY', 'district of columbia': 'DC',
+}
+
+function stateCode(a: Record<string, string>): string {
+  const iso = a['ISO3166-2-lvl4'] // e.g. "US-TX"
+  if (iso?.startsWith('US-')) return iso.slice(3)
+  const s = a.state ?? ''
+  return STATE_ABBR[s.toLowerCase()] ?? s
+}
+
+export async function geocodeSearch(query: string, limit = 5): Promise<GeocodeResult[]> {
   const q = (query ?? '').trim()
   if (!q) return []
   if (offline()) return [OFFLINE_RESULT]
-  const url = new URL('https://photon.komoot.io/api/')
+  const url = new URL('https://nominatim.openstreetmap.org/search')
   url.searchParams.set('q', q)
+  url.searchParams.set('format', 'jsonv2')
+  url.searchParams.set('addressdetails', '1')
   url.searchParams.set('limit', String(limit))
-  url.searchParams.set('lang', 'en')
-  // Bias toward the org's service area (North Texas).
-  url.searchParams.set('lat', '32.99')
-  url.searchParams.set('lon', '-96.75')
+  url.searchParams.set('countrycodes', 'us')
+  url.searchParams.set('viewbox', NOMINATIM_VIEWBOX)
   try {
-    const res = await $fetch<{ features?: any[] }>(url.toString())
-    return (res?.features ?? [])
-      .map((f) => {
-        const p = f.properties ?? {}
-        const [lon, lat] = f.geometry?.coordinates ?? []
-        const street = [p.housenumber, p.street || p.name].filter(Boolean).join(' ') || p.name || ''
-        const city = p.city || p.town || p.village || p.county || ''
-        const state = p.state || ''
-        const zip = p.postcode || ''
+    const res = await $fetch<NominatimResult[]>(url.toString(), {
+      headers: { 'User-Agent': NOMINATIM_UA },
+    })
+    return (res ?? [])
+      .map((r) => {
+        const a = r.address ?? {}
+        const lat = parseFloat(r.lat)
+        const lon = parseFloat(r.lon)
+        // A named POI (hospital, campus) carries the label in `name`; a plain
+        // address has house_number + road.
+        const road = a.road || a.pedestrian || a.footway || a.path || ''
+        const street = [a.house_number, road].filter(Boolean).join(' ') || r.name || ''
+        const city =
+          a.city || a.town || a.village || a.hamlet || a.suburb || a.municipality || a.county || ''
+        const state = stateCode(a)
+        const zip = a.postcode || ''
         const label = [street, city, state, zip].filter(Boolean).join(', ')
         return { label, address: { street, city, state, zip }, lat, lon } as GeocodeResult
       })
       .filter((r) => (r.address.street || r.label) && Number.isFinite(r.lat))
   } catch (err) {
-    console.error('photonSearch failed', err)
+    console.error('geocodeSearch failed', err)
     return []
   }
 }
 
 export async function geocodeOne(query: string): Promise<{ lat: number; lon: number } | null> {
-  const [first] = await photonSearch(query, 1)
+  const [first] = await geocodeSearch(query, 1)
   return first ? { lat: first.lat, lon: first.lon } : null
 }
 

@@ -306,7 +306,7 @@
   const secondaryActions = computed(() => actions.value.filter((a) => a !== primaryAction.value))
 
   // Pickup/dropoff coordinates for the route map, taken from the (cached)
-  // estimate response (geocoded server-side via Photon). null until available.
+  // estimate response (geocoded server-side via Nominatim). null until available.
   const mapPickup = computed(() =>
     estimate.value?.pickupLat != null && estimate.value?.pickupLng != null
       ? { lat: estimate.value.pickupLat, lng: estimate.value.pickupLng }

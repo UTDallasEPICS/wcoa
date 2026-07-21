@@ -113,7 +113,7 @@ is not documentation that can rot — it is enforced.
 | R-112 | Changing pickup/dropoff display invalidates the cached Maps estimate (#14) | `put/rides/[id].ts` | auto | `estimate-cache.test.ts` |
 | R-113 | Ride delete is a soft-delete: hidden from lists/byId/estimate, row + history preserved (#27) | `delete/rides/[id].ts` | auto | `soft-deletes.test.ts` |
 | R-114 | `get/rides/byId` of a missing/archived ride → 404 for every role | `get/rides/byId/[id].ts` | auto | `known-bugs.test.ts` |
-| R-115 | Estimate serves the cache when `estimatedAt` is set; on a miss it geocodes (Photon) + routes (OSRM) — open-source, no API key — caching distance/duration + coordinates + the driving-path geometry, and returns a clean error payload when the services are unavailable | `estimate/[id].ts` + `server/utils/maps.ts` | auto | `estimate-cache.test.ts`, `rides-estimate-scoping.test.ts` |
+| R-115 | Estimate serves the cache when `estimatedAt` is set; on a miss it geocodes (Nominatim) + routes (OSRM) — open-source, no API key — caching distance/duration + coordinates + the driving-path geometry, and returns a clean error payload when the services are unavailable | `estimate/[id].ts` + `server/utils/maps.ts` | auto | `estimate-cache.test.ts`, `rides-estimate-scoping.test.ts` |
 
 ## 7. Rides — volunteer self-service (signup / unsignup / complete)
 
@@ -213,7 +213,7 @@ is not documentation that can rot — it is enforced.
 | R-304 | Pages hydrate without mismatches (SSR output == client render): SSR-rendered dates are timezone-stable so server (UTC) and browser (local TZ) agree | `app/utils/datetime.ts`, rides/index.vue, rides/[id].vue, admin/audit.vue | auto [#98](https://github.com/UTDallasEPICS/wcoa/issues/98) | `hydration-datetime.test.ts` (server-side determinism) + browser: `admin-flows.spec.ts` (`/rides` hydrates clean) |
 | R-305 | Success/error toasts on every mutating UI action | all pages | auto | browser specs (asserted on key flows) |
 | R-306 | Rides list preferences (status filter, sort, rows-per-page, and table/cards view per breakpoint) persist per-user in the DB — cross-device — via `GET`/`PUT /api/*/preferences`; validated + session-scoped; the list seeds from and debounce-saves them | `UserPreference` model + `get/put preferences.ts` | auto | `preferences.test.ts` |
-| R-307 | Address autocomplete proxy `GET /api/get/geocode` is admin-only and returns open-source (Photon) suggestions; offline-safe under `MAPS_OFFLINE` so the suite stays hermetic | `get/geocode.ts` + `server/utils/maps.ts` | auto | `requirements-authz-matrix.test.ts` |
+| R-307 | Address autocomplete proxy `GET /api/get/geocode` is admin-only and returns open-source (Nominatim) suggestions with structured street/city/state/zip + coordinates; offline-safe under `MAPS_OFFLINE` so the suite stays hermetic | `get/geocode.ts` + `server/utils/maps.ts` | auto | `requirements-authz-matrix.test.ts` |
 
 ## Known non-requirements / accepted behavior
 

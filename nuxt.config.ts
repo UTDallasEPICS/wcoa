@@ -20,7 +20,7 @@ export default defineNuxtConfig({
     },
   },
   // Maps/geocoding/routing use key-less open-source services (MapLibre +
-  // OpenFreeMap tiles, Photon geocoding, OSRM routing), so no map API keys /
+  // OpenFreeMap tiles, Nominatim geocoding, OSRM routing), so no map API keys /
   // runtimeConfig are needed. The former Google Directions + Embed keys are gone.
   nitro: {
     externals: {

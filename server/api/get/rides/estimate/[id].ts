@@ -62,7 +62,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
   // Issue #14: serve the cached estimate + coordinates when present. The cache is
   // invalidated whenever pickup/dropoff change (server/api/put/rides/[id].ts), so
   // a populated cache is always current. Caching also keeps us light on the free
-  // public Photon/OSRM instances.
+  // public Nominatim/OSRM instances.
   if (ride.estimatedAt !== null) {
     let routeGeometry = parseGeometry(ride.cachedRouteGeometry)
     let durationText = ride.cachedDurationText
@@ -134,7 +134,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
     routeGeometry: null,
   }
 
-  // Geocode both endpoints (Photon), then route between them (OSRM) — all
+  // Geocode both endpoints (Nominatim), then route between them (OSRM) — all
   // open-source, no key. Each helper returns null on failure so we surface a
   // friendly message instead of erroring the page.
   const [from, to] = await Promise.all([

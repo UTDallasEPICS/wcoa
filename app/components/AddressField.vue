@@ -2,8 +2,8 @@
   import type { RideAddressForm } from '../utils/rideForm'
 
   // One unified address field: search and pick a real, verified address via the
-  // open-source Photon geocoder (/api/get/geocode). No stored-address search and
-  // no parallel manual street/city/state/zip fields — you type, pick a
+  // open-source Nominatim geocoder (/api/get/geocode). No stored-address search
+  // and no parallel manual street/city/state/zip fields — you type, pick a
   // suggestion, done. The v-model is the structured address the ride form stores.
   const address = defineModel<RideAddressForm>({ required: true })
 
