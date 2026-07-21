@@ -24,5 +24,7 @@ export default defineEventHandler(async (event) => {
     rideSort: pref?.rideSort ?? null,
     rideAssignedToMeOnly: pref?.rideAssignedToMeOnly ?? false,
     ridesPerPage: pref?.ridesPerPage ?? null,
+    ridesViewDesktop: pref?.ridesViewDesktop ?? null,
+    ridesViewMobile: pref?.ridesViewMobile ?? null,
   }
 })

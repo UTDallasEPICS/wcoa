@@ -22,6 +22,12 @@ model UserPreference {
   // devices. null = client default (10).
   ridesPerPage Int?
 
+  // Rides list view per breakpoint: "table" | "cards". Stored separately so the
+  // desktop and mobile choices are independent. null = client default
+  // (desktop -> table, mobile -> cards).
+  ridesViewDesktop String?
+  ridesViewMobile  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

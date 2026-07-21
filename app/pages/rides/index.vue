@@ -46,6 +46,47 @@
   // a request per keystroke.
   const PAGE_SIZE_OPTIONS = [5, 10, 20, 50]
   const pageSize = ref<number>(prefs.value?.ridesPerPage ?? 10)
+
+  // Rides list view per breakpoint (table vs cards), seeded from the saved
+  // preference. Because prefs is fetched server-side, the CSS-driven visibility
+  // below is deterministic at SSR — no hydration flash. Defaults: desktop rows,
+  // mobile cards.
+  const desktopView = ref<string>(prefs.value?.ridesViewDesktop ?? 'table')
+  const mobileView = ref<string>(prefs.value?.ridesViewMobile ?? 'cards')
+
+  // Visibility is pure CSS (max-lg = below 1024px, lg = 1024px+), driven by the
+  // per-breakpoint preference, so both the table and cards stay in the DOM and
+  // the right one shows at each width without any JS viewport detection.
+  const tableVisibility = computed(() => [
+    mobileView.value === 'table' ? 'max-lg:block' : 'max-lg:hidden',
+    desktopView.value === 'table' ? 'lg:block' : 'lg:hidden',
+  ])
+  const cardsVisibility = computed(() => [
+    mobileView.value === 'cards' ? 'max-lg:block' : 'max-lg:hidden',
+    desktopView.value === 'cards' ? 'lg:block' : 'lg:hidden',
+  ])
+
+  // Client-only breakpoint flag — used ONLY by the view toggle to know which
+  // breakpoint's preference to read/write. Rendering never depends on it, so it
+  // can't cause an SSR/hydration mismatch.
+  const isDesktop = ref(true)
+  const onViewportChange = (e: MediaQueryListEvent) => {
+    isDesktop.value = e.matches
+  }
+  let viewportMql: MediaQueryList | undefined
+  onMounted(() => {
+    viewportMql = window.matchMedia('(min-width: 1024px)')
+    isDesktop.value = viewportMql.matches
+    viewportMql.addEventListener('change', onViewportChange)
+  })
+  onUnmounted(() => viewportMql?.removeEventListener('change', onViewportChange))
+
+  const currentView = computed(() => (isDesktop.value ? desktopView.value : mobileView.value))
+  function setView(view: 'table' | 'cards') {
+    if (isDesktop.value) desktopView.value = view
+    else mobileView.value = view
+  }
+
   const page = ref(1)
   const debouncedSearch = ref('')
   const applyDebouncedSearch = debounce((value: string) => {
@@ -100,10 +141,16 @@
         rideSort: sort.value,
         rideAssignedToMeOnly: !isAdmin.value && assignedToMe.value,
         ridesPerPage: Number(pageSize.value),
+        ridesViewDesktop: desktopView.value,
+        ridesViewMobile: mobileView.value,
       },
     }).catch((err) => console.error('Failed to save preferences', err))
   }, 400)
-  watch([selectedStatuses, sort, assignedToMe, pageSize], () => savePreferences(), { deep: true })
+  watch(
+    [selectedStatuses, sort, assignedToMe, pageSize, desktopView, mobileView],
+    () => savePreferences(),
+    { deep: true }
+  )
 
   // One-time migration off the old cookie model: if the user has no saved DB
   // preference yet but a legacy cookie exists, convert it, persist once, and
@@ -434,20 +481,49 @@
                 </div>
               </template>
             </UPopover>
+
+            <!-- View toggle: rows (table) vs cards. Flips the CURRENT breakpoint's
+                 saved view. Client-only, so SSR/hydration stay clean — the actual
+                 rendering is CSS-driven off the saved prefs. -->
+            <ClientOnly>
+              <div
+                class="inline-flex items-center rounded-lg border border-gray-200 p-0.5 dark:border-gray-700"
+              >
+                <UButton
+                  icon="i-lucide-table"
+                  size="sm"
+                  square
+                  :color="currentView === 'table' ? 'primary' : 'neutral'"
+                  :variant="currentView === 'table' ? 'subtle' : 'ghost'"
+                  aria-label="Table view"
+                  @click="setView('table')"
+                />
+                <UButton
+                  icon="i-lucide-layout-grid"
+                  size="sm"
+                  square
+                  :color="currentView === 'cards' ? 'primary' : 'neutral'"
+                  :variant="currentView === 'cards' ? 'subtle' : 'ghost'"
+                  aria-label="Card view"
+                  @click="setView('cards')"
+                />
+              </div>
+            </ClientOnly>
           </div>
         </div>
 
-        <!-- Scroll region: table (desktop) / cards (mobile) scroll here, beneath
-             the pinned pagination footer below. -->
-        <div class="min-h-0 flex-1 overflow-y-auto">
-          <!-- Desktop (lg+): the full table with a sticky header. Below lg it would
-               overflow sideways, so the ride cards render instead. -->
+        <!-- Scroll region: the chosen view (table or cards) scrolls here beneath
+             the pinned pagination footer. overflow-auto so a table can scroll
+             sideways when shown on a narrow (mobile) width. -->
+        <div class="min-h-0 flex-1 overflow-auto">
+          <!-- Table view (sticky header). Shown per the saved per-breakpoint
+               preference; on a narrow width it scrolls horizontally. -->
           <UTable
             :data="rides"
             :columns="columns"
             :loading="status === 'pending'"
             sticky
-            class="hidden w-full cursor-pointer lg:block"
+            :class="['w-full cursor-pointer', tableVisibility]"
             @select="onSelect"
           >
             <template #empty-state>
@@ -461,10 +537,13 @@
             </template>
           </UTable>
 
-          <!-- Mobile / tablet (below lg): each ride as a tap-friendly card. Same data,
-         same navigation target — only the presentation differs. -->
-          <div class="lg:hidden">
-            <div v-if="status === 'pending'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <!-- Card view: each ride as a tap-friendly card. Same data + navigation
+               as the table; shown per the saved per-breakpoint preference. -->
+          <div :class="cardsVisibility">
+            <div
+              v-if="status === 'pending'"
+              class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+            >
               <USkeleton v-for="n in 4" :key="n" class="h-44 w-full rounded-xl" />
             </div>
 
@@ -477,7 +556,7 @@
               <p class="text-sm">Try adjusting your search or filters</p>
             </div>
 
-            <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <NuxtLink
                 v-for="ride in rides"
                 :key="ride.id"
