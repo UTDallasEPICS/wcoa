@@ -34,7 +34,10 @@
       return
     }
     try {
-      const results = await $fetch<any[]>('/api/get/addresses', { query })
+      // Real-address autocomplete/verification via the open-source Photon
+      // geocoder (server proxy at /api/get/geocode) — replaces the old
+      // known-addresses-only DB search so any real address can be found + picked.
+      const results = await $fetch<any[]>('/api/get/geocode', { query: { q: query.search } })
       // Ignore stale responses that no longer match the current term.
       if ((term ?? '').trim() === query.search) options.value = (results ?? []).slice(0, 5)
     } catch (err) {
