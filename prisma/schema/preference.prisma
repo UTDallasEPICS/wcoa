@@ -18,6 +18,16 @@ model UserPreference {
   // Volunteers only: limit the rides list to rides assigned to me.
   rideAssignedToMeOnly Boolean @default(false)
 
+  // Rows-per-page for the rides list, persisted so it follows the user across
+  // devices. null = client default (10).
+  ridesPerPage Int?
+
+  // Rides list view per breakpoint: "table" | "cards". Stored separately so the
+  // desktop and mobile choices are independent. null = client default
+  // (desktop -> table, mobile -> cards).
+  ridesViewDesktop String?
+  ridesViewMobile  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

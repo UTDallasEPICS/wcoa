@@ -12,6 +12,9 @@ type Prefs = {
   rideStatusFilter: string[] | null
   rideSort: string | null
   rideAssignedToMeOnly: boolean
+  ridesPerPage: number | null
+  ridesViewDesktop: string | null
+  ridesViewMobile: string | null
 }
 
 describe('user preferences API', () => {
@@ -21,6 +24,46 @@ describe('user preferences API', () => {
     expect(res.rideStatusFilter).toBeNull()
     expect(res.rideSort).toBeNull()
     expect(res.rideAssignedToMeOnly).toBe(false)
+    expect(res.ridesPerPage).toBeNull()
+    expect(res.ridesViewDesktop).toBeNull()
+    expect(res.ridesViewMobile).toBeNull()
+  })
+
+  it('persists per-breakpoint view (ridesViewDesktop/Mobile) independently', async () => {
+    const cookie = await loginAs('bob@example.com')
+    const put = await $fetch<Prefs>('/api/put/preferences', {
+      method: 'PUT',
+      headers: { cookie },
+      body: { ridesViewDesktop: 'cards', ridesViewMobile: 'table' },
+    })
+    expect(put.ridesViewDesktop).toBe('cards')
+    expect(put.ridesViewMobile).toBe('table')
+    const get = await $fetch<Prefs>('/api/get/preferences', { headers: { cookie } })
+    expect(get.ridesViewDesktop).toBe('cards')
+    expect(get.ridesViewMobile).toBe('table')
+  })
+
+  it('rejects an invalid view value with 400', async () => {
+    const cookie = await loginAs('reachtusharwani@gmail.com')
+    await expect(
+      $fetch('/api/put/preferences', {
+        method: 'PUT',
+        headers: { cookie },
+        body: { ridesViewDesktop: 'grid' },
+      })
+    ).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  it('persists rows-per-page (ridesPerPage) and reads it back', async () => {
+    const cookie = await loginAs('bob@example.com')
+    const put = await $fetch<Prefs>('/api/put/preferences', {
+      method: 'PUT',
+      headers: { cookie },
+      body: { ridesPerPage: 50 },
+    })
+    expect(put.ridesPerPage).toBe(50)
+    const get = await $fetch<Prefs>('/api/get/preferences', { headers: { cookie } })
+    expect(get.ridesPerPage).toBe(50)
   })
 
   it('persists a PUT and reads it back (status filter round-trips as an array)', async () => {
@@ -76,7 +119,7 @@ describe('user preferences API', () => {
         method: 'PUT',
         headers: { cookie },
         body: { rideStatusFilter: ['BOGUS'] },
-      }),
+      })
     ).rejects.toMatchObject({ statusCode: 400 })
   })
 
@@ -87,14 +130,14 @@ describe('user preferences API', () => {
         method: 'PUT',
         headers: { cookie },
         body: { evil: true },
-      }),
+      })
     ).rejects.toMatchObject({ statusCode: 400 })
   })
 
   it('requires authentication', async () => {
     await expect($fetch('/api/get/preferences')).rejects.toMatchObject({ statusCode: 401 })
     await expect(
-      $fetch('/api/put/preferences', { method: 'PUT', body: { rideSort: 'asc' } }),
+      $fetch('/api/put/preferences', { method: 'PUT', body: { rideSort: 'asc' } })
     ).rejects.toMatchObject({ statusCode: 401 })
   })
 })

@@ -15,6 +15,9 @@ const prefSchema = z
     rideStatusFilter: z.array(z.enum(RIDE_STATUSES)).optional(),
     rideSort: z.enum(['asc', 'desc']).optional(),
     rideAssignedToMeOnly: z.boolean().optional(),
+    ridesPerPage: z.number().int().positive().max(100).optional(),
+    ridesViewDesktop: z.enum(['table', 'cards']).optional(),
+    ridesViewMobile: z.enum(['table', 'cards']).optional(),
   })
   .strict()
 
@@ -33,6 +36,9 @@ export default defineEventHandler(async (event) => {
     rideStatusFilter?: string
     rideSort?: string
     rideAssignedToMeOnly?: boolean
+    ridesPerPage?: number
+    ridesViewDesktop?: string
+    ridesViewMobile?: string
   } = {}
   if (body.rideStatusFilter !== undefined) {
     data.rideStatusFilter = Array.from(new Set(body.rideStatusFilter)).join(',')
@@ -41,6 +47,9 @@ export default defineEventHandler(async (event) => {
   if (body.rideAssignedToMeOnly !== undefined) {
     data.rideAssignedToMeOnly = body.rideAssignedToMeOnly
   }
+  if (body.ridesPerPage !== undefined) data.ridesPerPage = body.ridesPerPage
+  if (body.ridesViewDesktop !== undefined) data.ridesViewDesktop = body.ridesViewDesktop
+  if (body.ridesViewMobile !== undefined) data.ridesViewMobile = body.ridesViewMobile
 
   const pref = await prisma.userPreference.upsert({
     where: { userId },
@@ -53,5 +62,8 @@ export default defineEventHandler(async (event) => {
       pref.rideStatusFilter != null ? pref.rideStatusFilter.split(',').filter(Boolean) : null,
     rideSort: pref.rideSort ?? null,
     rideAssignedToMeOnly: pref.rideAssignedToMeOnly,
+    ridesPerPage: pref.ridesPerPage ?? null,
+    ridesViewDesktop: pref.ridesViewDesktop ?? null,
+    ridesViewMobile: pref.ridesViewMobile ?? null,
   }
 })
