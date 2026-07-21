@@ -1,26 +1,25 @@
 <script setup lang="ts">
   import type { RideAddressForm } from '../utils/rideForm'
 
-  // Search-first address entry (issue #19 logic, extracted + streamlined). Shows
-  // a compact summary once an address is set (e.g. pre-filled from the client's
-  // home), a search box with server suggestions to pick an existing address, and
-  // an "Enter a new address" disclosure that reveals the manual fields. The v-model
-  // is the structured { street, city, state, zip } object the ride form stores.
+  // One unified address field: search and pick a real, verified address via the
+  // open-source Photon geocoder (/api/get/geocode). No stored-address search and
+  // no parallel manual street/city/state/zip fields — you type, pick a
+  // suggestion, done. The v-model is the structured address the ride form stores.
   const address = defineModel<RideAddressForm>({ required: true })
 
   const props = defineProps<{
     label: string
-    // Optional note shown under the summary, e.g. "From Martha's home address".
+    // Optional note shown under the selected address, e.g. "From <client>'s home".
     hint?: string
   }>()
 
   const search = ref('')
   const options = ref<any[]>([])
-  const editing = ref(false) // user tapped Change / no address yet
-  const manual = ref(false) // manual field entry revealed
+  const loading = ref(false)
+  const searched = ref(false) // a query has completed — lets us show "no results"
+  const editing = ref(false) // replacing an already-set address
 
   const isSet = computed(() => !!address.value.street?.trim())
-  const showSummary = computed(() => isSet.value && !editing.value)
   const summary = computed(() =>
     [address.value.street, address.value.city, address.value.state, address.value.zip]
       .filter(Boolean)
@@ -28,29 +27,36 @@
   )
 
   async function fetchOptions(term: string) {
-    const query = buildAddressQuery(term)
-    if (!query) {
+    const q = (term ?? '').trim()
+    if (q.length < 3) {
       options.value = []
+      searched.value = false
       return
     }
+    loading.value = true
     try {
-      // Real-address autocomplete/verification via the open-source Photon
-      // geocoder (server proxy at /api/get/geocode) — replaces the old
-      // known-addresses-only DB search so any real address can be found + picked.
-      const results = await $fetch<any[]>('/api/get/geocode', { query: { q: query.search } })
-      // Ignore stale responses that no longer match the current term.
-      if ((term ?? '').trim() === query.search) options.value = (results ?? []).slice(0, 5)
+      const results = await $fetch<any[]>('/api/get/geocode', { query: { q } })
+      // Ignore stale responses that no longer match the current input.
+      if ((search.value ?? '').trim() === q) {
+        options.value = results ?? []
+        searched.value = true
+      }
     } catch (err) {
-      console.error('Failed to fetch address suggestions', err)
+      console.error('Address search failed', err)
       options.value = []
+      searched.value = true
+    } finally {
+      loading.value = false
     }
   }
-  const debouncedFetch = debounce((term: string) => fetchOptions(term), 250)
+  const debouncedFetch = debounce((term: string) => fetchOptions(term), 300)
 
   watch(search, (term) => {
-    if (!buildAddressQuery(term)) {
+    searched.value = false
+    if ((term ?? '').trim().length < 3) {
       debouncedFetch.cancel()
       options.value = []
+      loading.value = false
       return
     }
     debouncedFetch(term)
@@ -66,18 +72,19 @@
     search.value = ''
     options.value = []
     editing.value = false
-    manual.value = false
+    searched.value = false
   }
 
   function change() {
     editing.value = true
-    manual.value = false
     search.value = ''
     options.value = []
+    searched.value = false
   }
 
-  function enterManually() {
-    manual.value = true
+  function cancel() {
+    editing.value = false
+    search.value = ''
     options.value = []
   }
 </script>
@@ -88,16 +95,16 @@
       {{ label }}
     </label>
 
-    <!-- Summary: address is set and we're not editing it -->
+    <!-- Selected address -->
     <div
-      v-if="showSummary"
+      v-if="isSet && !editing"
       class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50"
     >
       <div class="flex items-start justify-between gap-3">
-        <div class="flex items-start gap-2">
+        <span class="flex items-start gap-2 text-sm font-medium text-gray-900 dark:text-white">
           <UIcon name="i-lucide-map-pin" class="text-primary mt-0.5 size-4 shrink-0" />
-          <span class="text-sm font-medium text-gray-900 dark:text-white">{{ summary }}</span>
-        </div>
+          {{ summary }}
+        </span>
         <UButton
           label="Change"
           size="xs"
@@ -108,74 +115,51 @@
         />
       </div>
       <p v-if="hint" class="text-primary mt-2 flex items-center gap-1.5 text-xs">
-        <UIcon name="i-lucide-check" class="size-3.5" />
+        <UIcon name="i-lucide-check" class="size-3.5 shrink-0" />
         {{ hint }}
       </p>
     </div>
 
-    <!-- Entry: search + suggestions, with a manual-entry disclosure -->
-    <div v-else class="space-y-2">
-      <div v-if="!manual" class="relative">
-        <UInput
-          v-model="search"
-          icon="i-lucide-search"
-          placeholder="Search for an address…"
-          autocomplete="off"
-          class="w-full"
-        />
-        <div
-          v-if="options.length > 0 && search"
-          class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+    <!-- Search + autocomplete -->
+    <div v-else class="relative">
+      <UInput
+        v-model="search"
+        icon="i-lucide-search"
+        :loading="loading"
+        placeholder="Search for an address…"
+        autocomplete="off"
+        class="w-full"
+      />
+
+      <div
+        v-if="search.trim().length >= 3"
+        class="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+      >
+        <button
+          v-for="opt in options"
+          :key="`${opt.lat},${opt.lon},${opt.label}`"
+          type="button"
+          class="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          @click="pick(opt)"
         >
-          <button
-            v-for="opt in options"
-            :key="opt.id"
-            type="button"
-            class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-            @click="pick(opt)"
-          >
-            <UIcon name="i-lucide-map-pin" class="size-3.5 shrink-0 text-gray-400" />
-            <span class="truncate">{{ opt.label }}</span>
-          </button>
-        </div>
+          <UIcon name="i-lucide-map-pin" class="mt-0.5 size-3.5 shrink-0 text-gray-400" />
+          <span>{{ opt.label }}</span>
+        </button>
+        <p v-if="loading" class="px-3 py-2 text-sm text-gray-500">Searching…</p>
+        <p v-else-if="searched && !options.length" class="px-3 py-2 text-sm text-gray-500">
+          No matching address found — check the spelling.
+        </p>
       </div>
 
-      <!-- Manual fields -->
-      <div v-if="manual" class="space-y-2">
-        <UInput v-model="address.street" placeholder="Street address" class="w-full" />
-        <UInput v-model="address.city" placeholder="City" class="w-full" />
-        <div class="grid grid-cols-2 gap-2">
-          <UInput v-model="address.state" placeholder="State" />
-          <UInput v-model="address.zip" placeholder="Zip" />
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between">
-        <UButton
-          v-if="!manual"
-          label="Enter a new address"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          icon="i-lucide-plus"
-          @click="enterManually"
-        />
-        <UButton
-          v-else
-          label="Search instead"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          icon="i-lucide-search"
-          @click="manual = false"
-        />
+      <div class="mt-1.5 flex items-center justify-between">
+        <span class="text-xs text-gray-400">Addresses from OpenStreetMap</span>
         <UButton
           v-if="isSet"
           label="Cancel"
           size="xs"
           color="neutral"
           variant="ghost"
-          @click="editing = false"
+          @click="cancel"
         />
       </div>
     </div>
