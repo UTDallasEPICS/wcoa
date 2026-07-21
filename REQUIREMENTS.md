@@ -212,7 +212,7 @@ is not documentation that can rot — it is enforced.
 | R-303 | Admin audit page: bounded table, action/user filters | `app/pages/admin/audit.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-304 | Pages hydrate without mismatches (SSR output == client render): SSR-rendered dates are timezone-stable so server (UTC) and browser (local TZ) agree | `app/utils/datetime.ts`, rides/index.vue, rides/[id].vue, admin/audit.vue | auto [#98](https://github.com/UTDallasEPICS/wcoa/issues/98) | `hydration-datetime.test.ts` (server-side determinism) + browser: `admin-flows.spec.ts` (`/rides` hydrates clean) |
 | R-305 | Success/error toasts on every mutating UI action | all pages | auto | browser specs (asserted on key flows) |
-| R-306 | Rides list preferences (status filter, sort, rows-per-page, and table/cards view per breakpoint) persist per-user in the DB — cross-device — via `GET`/`PUT /api/*/preferences`; validated + session-scoped; the list seeds from and debounce-saves them | `UserPreference` model + `get/put preferences.ts` | auto | `preferences.test.ts` |
+| R-306 | Rides list preferences (status filter, sort, rows-per-page, table/cards view per breakpoint, and clock format auto/12h/24h) persist per-user in the DB — cross-device — via `GET`/`PUT /api/*/preferences`; validated + session-scoped; the list seeds from and debounce-saves them. The clock-format override exists because Chrome/V8 ignore macOS's force-24h flag for en-US | `UserPreference` model + `get/put preferences.ts` | auto | `preferences.test.ts` |
 
 ## Known non-requirements / accepted behavior
 

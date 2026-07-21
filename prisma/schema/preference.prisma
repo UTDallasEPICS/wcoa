@@ -28,6 +28,12 @@ model UserPreference {
   ridesViewDesktop String?
   ridesViewMobile  String?
 
+  // Clock format for all rendered times: "auto" | "12h" | "24h". null/"auto" =
+  // follow the browser's detected hour cycle. An explicit override is needed
+  // because Chrome/V8 ignore macOS's "24-Hour Time" (AppleICUForce24HourTime)
+  // flag for en-US, so auto-detection can't see that preference.
+  clockFormat String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
