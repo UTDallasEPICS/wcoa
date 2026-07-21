@@ -29,8 +29,16 @@ interface EstimateResponse {
   pickupLng: number | null
   dropoffLat: number | null
   dropoffLng: number | null
+  routeGeometry: number[][] | null
   error: string | null
 }
+
+// Canned OSRM-style geometry ([lon,lat][]) stored as JSON in the cache.
+const ROUTE_GEOMETRY: number[][] = [
+  [-96.7, 33.02],
+  [-96.71, 32.99],
+  [-96.73, 32.95],
+]
 
 // Track rows we mutate so each test leaves the shared DB as it found it.
 const touched: string[] = []
@@ -53,7 +61,8 @@ function populateCache(id: string): void {
         `UPDATE ride SET cachedDistanceText = ?, cachedDistanceValue = ?,
            cachedDurationText = ?, cachedDurationValue = ?,
            cachedPickupLat = ?, cachedPickupLng = ?,
-           cachedDropoffLat = ?, cachedDropoffLng = ?, estimatedAt = ?
+           cachedDropoffLat = ?, cachedDropoffLng = ?,
+           cachedRouteGeometry = ?, estimatedAt = ?
          WHERE id = ?`
       )
       .run(
@@ -65,6 +74,7 @@ function populateCache(id: string): void {
         -96.7,
         32.95,
         -96.73,
+        JSON.stringify(ROUTE_GEOMETRY),
         new Date().toISOString(),
         id
       )
@@ -82,7 +92,8 @@ function clearCache(id: string): void {
         `UPDATE ride SET cachedDistanceText = NULL, cachedDistanceValue = NULL,
            cachedDurationText = NULL, cachedDurationValue = NULL,
            cachedPickupLat = NULL, cachedPickupLng = NULL,
-           cachedDropoffLat = NULL, cachedDropoffLng = NULL, estimatedAt = NULL
+           cachedDropoffLat = NULL, cachedDropoffLng = NULL,
+           cachedRouteGeometry = NULL, estimatedAt = NULL
          WHERE id = ?`
       )
       .run(id)
@@ -115,6 +126,8 @@ describe('ride estimate caching (issue #14)', () => {
     expect(res.pickupLng).toBe(-96.7)
     expect(res.dropoffLat).toBe(32.95)
     expect(res.dropoffLng).toBe(-96.73)
+    // The driving path is cached (JSON) + served for the map's route line.
+    expect(res.routeGeometry).toEqual(ROUTE_GEOMETRY)
   })
 
   it('re-misses after a PUT changes the address (cache invalidation)', async () => {
@@ -144,5 +157,6 @@ describe('ride estimate caching (issue #14)', () => {
     expect(miss.distance).toBe(null)
     expect(miss.durationValue).toBe(null)
     expect(miss.pickupLat).toBe(null)
+    expect(miss.routeGeometry).toBe(null)
   })
 })

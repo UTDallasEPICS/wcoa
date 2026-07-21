@@ -42,6 +42,10 @@ model Ride {
   cachedDropoffLat Float?
   cachedDropoffLng Float?
 
+  // The driving route path (OSRM) as a JSON-encoded [lon,lat][] LineString, so
+  // the map can draw the route. Invalidated with the rest of the estimate.
+  cachedRouteGeometry String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

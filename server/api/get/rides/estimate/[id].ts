@@ -9,6 +9,7 @@ interface EstimateResponse {
   pickupLng: number | null
   dropoffLat: number | null
   dropoffLng: number | null
+  routeGeometry: number[][] | null
   error: string | null
 }
 
@@ -34,6 +35,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
       cachedPickupLng: true,
       cachedDropoffLat: true,
       cachedDropoffLng: true,
+      cachedRouteGeometry: true,
       estimatedAt: true,
       volunteer: { select: { userId: true } },
     },
@@ -62,15 +64,60 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
   // a populated cache is always current. Caching also keeps us light on the free
   // public Photon/OSRM instances.
   if (ride.estimatedAt !== null) {
+    let routeGeometry = parseGeometry(ride.cachedRouteGeometry)
+    let durationText = ride.cachedDurationText
+    let distanceText = ride.cachedDistanceText
+    let durationValue = ride.cachedDurationValue
+    let distanceValue = ride.cachedDistanceValue
+
+    // Backfill for legacy cache rows: rides estimated before the route path was
+    // cached have coordinates but no geometry, so the map drew a straight line
+    // AND the distance/duration were computed by the old (Google) estimator, so
+    // they wouldn't match the real path. Re-run just the routing once from the
+    // cached coordinates (no re-geocode) and refresh distance + duration + line
+    // together, so all three come from one consistent OSRM response. Offline
+    // (tests) or an OSRM outage leaves the cached values in place with a
+    // straight-line fallback — no error, still a valid hit.
+    if (
+      !routeGeometry &&
+      ride.cachedPickupLat != null &&
+      ride.cachedPickupLng != null &&
+      ride.cachedDropoffLat != null &&
+      ride.cachedDropoffLng != null
+    ) {
+      const backfill = await osrmRoute(
+        { lat: ride.cachedPickupLat, lon: ride.cachedPickupLng },
+        { lat: ride.cachedDropoffLat, lon: ride.cachedDropoffLng }
+      )
+      if (backfill) {
+        routeGeometry = backfill.geometry
+        durationText = formatDuration(backfill.durationSec)
+        distanceText = formatDistance(backfill.distanceMeters)
+        durationValue = Math.round(backfill.durationSec)
+        distanceValue = Math.round(backfill.distanceMeters)
+        await prisma.ride.update({
+          where: { id },
+          data: {
+            cachedRouteGeometry: backfill.geometry ? JSON.stringify(backfill.geometry) : null,
+            cachedDurationText: durationText,
+            cachedDistanceText: distanceText,
+            cachedDurationValue: durationValue,
+            cachedDistanceValue: distanceValue,
+          },
+        })
+      }
+    }
+
     return {
-      duration: ride.cachedDurationText,
-      distance: ride.cachedDistanceText,
-      durationValue: ride.cachedDurationValue,
-      distanceValue: ride.cachedDistanceValue,
+      duration: durationText,
+      distance: distanceText,
+      durationValue,
+      distanceValue,
       pickupLat: ride.cachedPickupLat,
       pickupLng: ride.cachedPickupLng,
       dropoffLat: ride.cachedDropoffLat,
       dropoffLng: ride.cachedDropoffLng,
+      routeGeometry,
       error: null,
     }
   }
@@ -84,6 +131,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
     pickupLng: null,
     dropoffLat: null,
     dropoffLng: null,
+    routeGeometry: null,
   }
 
   // Geocode both endpoints (Photon), then route between them (OSRM) — all
@@ -117,6 +165,7 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
       cachedPickupLng: from.lon,
       cachedDropoffLat: to.lat,
       cachedDropoffLng: to.lon,
+      cachedRouteGeometry: route.geometry ? JSON.stringify(route.geometry) : null,
       estimatedAt: new Date(),
     },
   })
@@ -130,6 +179,19 @@ export default defineEventHandler(async (event): Promise<EstimateResponse> => {
     pickupLng: from.lon,
     dropoffLat: to.lat,
     dropoffLng: to.lon,
+    routeGeometry: route.geometry,
     error: null,
   }
 })
+
+// The route geometry is cached as a JSON string ([lon,lat][]); tolerate a
+// malformed value by returning null rather than throwing the request.
+function parseGeometry(raw: string | null): number[][] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as number[][]) : null
+  } catch {
+    return null
+  }
+}

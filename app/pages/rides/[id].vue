@@ -317,6 +317,8 @@
       ? { lat: estimate.value.dropoffLat, lng: estimate.value.dropoffLng }
       : null
   )
+  // Driving path (OSRM geometry) for the route line; null → straight fallback.
+  const mapRoute = computed(() => estimate.value?.routeGeometry ?? null)
 
   // Universal maps directions deep-link: origin = pickup, destination = dropoff.
   // On a phone the OS hands this off to the native maps app; on desktop it
@@ -508,7 +510,7 @@
               />
 
               <ClientOnly>
-                <RideRouteMap :pickup="mapPickup" :dropoff="mapDropoff" />
+                <RideRouteMap :pickup="mapPickup" :dropoff="mapDropoff" :route="mapRoute" />
                 <template #fallback>
                   <div
                     class="aspect-video w-full animate-pulse rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"

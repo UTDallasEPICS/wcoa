@@ -67,16 +67,27 @@ export async function geocodeOne(query: string): Promise<{ lat: number; lon: num
 export async function osrmRoute(
   from: { lat: number; lon: number },
   to: { lat: number; lon: number }
-): Promise<{ durationSec: number; distanceMeters: number } | null> {
+): Promise<{
+  durationSec: number
+  distanceMeters: number
+  geometry: number[][] | null
+} | null> {
   if (offline()) return null
-  const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=false`
+  // overview=full + geometries=geojson returns the drivable path as a GeoJSON
+  // LineString ([lon,lat] pairs) so the map can draw the route.
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`
   try {
-    const res = await $fetch<{ code?: string; routes?: { duration: number; distance: number }[] }>(
-      url
-    )
+    const res = await $fetch<{
+      code?: string
+      routes?: { duration: number; distance: number; geometry?: { coordinates?: number[][] } }[]
+    }>(url)
     const route = res?.routes?.[0]
     if (res?.code !== 'Ok' || !route) return null
-    return { durationSec: route.duration, distanceMeters: route.distance }
+    return {
+      durationSec: route.duration,
+      distanceMeters: route.distance,
+      geometry: route.geometry?.coordinates ?? null,
+    }
   } catch (err) {
     console.error('osrmRoute failed', err)
     return null

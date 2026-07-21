@@ -113,7 +113,7 @@ is not documentation that can rot — it is enforced.
 | R-112 | Changing pickup/dropoff display invalidates the cached Maps estimate (#14) | `put/rides/[id].ts` | auto | `estimate-cache.test.ts` |
 | R-113 | Ride delete is a soft-delete: hidden from lists/byId/estimate, row + history preserved (#27) | `delete/rides/[id].ts` | auto | `soft-deletes.test.ts` |
 | R-114 | `get/rides/byId` of a missing/archived ride → 404 for every role | `get/rides/byId/[id].ts` | auto | `known-bugs.test.ts` |
-| R-115 | Estimate serves the cache when `estimatedAt` is set; on a miss it geocodes (Photon) + routes (OSRM) — open-source, no API key — caching distance/duration + coordinates, and returns a clean error payload when the services are unavailable | `estimate/[id].ts` + `server/utils/maps.ts` | auto | `estimate-cache.test.ts`, `rides-estimate-scoping.test.ts` |
+| R-115 | Estimate serves the cache when `estimatedAt` is set; on a miss it geocodes (Photon) + routes (OSRM) — open-source, no API key — caching distance/duration + coordinates + the driving-path geometry, and returns a clean error payload when the services are unavailable | `estimate/[id].ts` + `server/utils/maps.ts` | auto | `estimate-cache.test.ts`, `rides-estimate-scoping.test.ts` |
 
 ## 7. Rides — volunteer self-service (signup / unsignup / complete)
 
@@ -204,7 +204,7 @@ is not documentation that can rot — it is enforced.
 | R-295 | Modal state fully resets when closed/reopened (#11) | rides/index.vue | auto | `ride-form-reset.test.ts` |
 | R-296 | Ride detail: status badge, Edit/Cancel/Delete (admin); Cancel goes through a confirm modal, shows a toast, hides the button once CANCELLED | `app/pages/rides/[id].vue` | auto | browser: `admin-flows.spec.ts` |
 | R-297 | Ride detail "Navigate" is a Google-Maps deep link (`maps/dir/?api=1`) with URL-encoded origin/destination (#26) | `app/utils/mapsLink.ts` | auto | `ride-navigate-link.test.ts` |
-| R-298 | Ride-detail route map uses MapLibre + OpenFreeMap tiles (no API key); degrades to a friendly placeholder when coordinates are unavailable, never an error page | `RideRouteMap.vue` + rides/[id].vue | auto | browser: `admin-flows.spec.ts` |
+| R-298 | Ride-detail route map uses MapLibre + OpenFreeMap tiles (no API key); plots pickup/dropoff markers and draws the driving route line (straight-line fallback when no geometry); degrades to a friendly placeholder when coordinates are unavailable, never an error page | `RideRouteMap.vue` + rides/[id].vue | auto | browser: `admin-flows.spec.ts` |
 | R-299 | Volunteer ride detail: Sign Up on CREATED rides; Unsign Up + Mark-as-Completed (duration modal) on own ASSIGNED rides | rides/[id].vue | auto | browser: `volunteer-flows.spec.ts` (completion pinned by [#87](https://github.com/UTDallasEPICS/wcoa/issues/87)) |
 | R-300 | People page: Volunteers/Clients/Admins tabs, search, role filter; edit modal prefills ALL fields and sends a full payload with phone normalized to digits | `app/pages/people.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-301 | Settings (volunteer): profile card, status selector, per-type notification toggles, reminder editor — all persisted via bySession endpoints | `app/pages/settings.vue` | auto | browser: `volunteer-flows.spec.ts` |
