@@ -43,10 +43,14 @@ test('R-294/R-305: Create Ride wizard — client auto-fills pickup; 3-step creat
   await page.getByRole('option', { name: 'Martha Jenkins' }).click()
   // Auto-fill (R-294): Martha's seeded home address lands in the pickup summary.
   await expect(page.getByText(/1501 H Avenue/i)).toBeVisible()
-  // Dropoff: search + pick a suggestion. The harness runs the geocoder offline
-  // (MAPS_OFFLINE=1), which returns one deterministic canned result.
-  await page.getByPlaceholder('Search for an address').fill('test address')
-  await page.getByRole('button', { name: /Test Address, Plano/ }).click()
+  // Dropoff: the field searches existing saved addresses; enter a new one via
+  // the manual fallback (deterministic regardless of what's seeded, and
+  // distinct from the pickup so the same-address guard doesn't block).
+  await page.getByRole('button', { name: /Enter a new address/ }).click()
+  await page.getByPlaceholder('Street address').fill('500 Test Blvd')
+  await page.getByPlaceholder('City').fill('Plano')
+  await page.getByPlaceholder('State').fill('TX')
+  await page.getByPlaceholder('Zip').fill('75024')
   await page.getByRole('button', { name: /Continue/ }).click()
 
   // --- Step 2: Schedule ---

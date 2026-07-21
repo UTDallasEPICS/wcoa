@@ -46,14 +46,6 @@ const MATRIX: Row[] = [
     volunteer: 403,
     admin: 'pass',
   },
-  {
-    method: 'GET',
-    path: '/api/get/geocode?q=plano',
-    anon: 401,
-    client: 403,
-    volunteer: 403,
-    admin: 'pass',
-  },
   { method: 'GET', path: '/api/get/admins', anon: 401, client: 403, volunteer: 403, admin: 'pass' },
   { method: 'GET', path: '/api/get/audit', anon: 401, client: 403, volunteer: 403, admin: 'pass' },
   {
