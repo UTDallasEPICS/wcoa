@@ -2,7 +2,10 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@nuxt/ui', 'nuxt-cron'],
-  css: ['./assets/css/main.css'],
+  // maplibre-gl.css is loaded globally (not from the component) so it's reliably
+  // bundled — without it the map canvas renders blank. It only styles
+  // `.maplibregl-*`, so it can't affect non-map pages.
+  css: ['./assets/css/main.css', 'maplibre-gl/dist/maplibre-gl.css'],
   // Dev file-watcher: never descend into `.claude/`. Claude Code stores its
   // agent git worktrees under `.claude/worktrees/` — full nested checkouts that
   // overwhelm the FSEvents/fs.watch watcher and crash `nuxt dev` with
