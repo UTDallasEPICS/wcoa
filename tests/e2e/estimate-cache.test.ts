@@ -7,13 +7,13 @@ import { loginAs } from '../utils/auth'
 await bootShared()
 
 // Issue #14: GET /api/get/rides/estimate/:id must serve a cached
-// distance/duration from the Ride record instead of hitting the Google Maps
-// Directions API on every load. The test env has no server API key, so a cache
-// MISS returns { error: 'Maps API Key not configured', ...nulls }. By populating
-// the cache columns directly in the DB, a cache HIT must instead return the
-// cached values with error: null — which is only possible once the endpoint
-// reads and serves the cache. (Before the fix the endpoint ignores the cache
-// columns and returns the "not configured" miss response, so this test fails.)
+// distance/duration (+ coordinates) from the Ride record instead of geocoding +
+// routing on every load. The harness runs maps offline (MAPS_OFFLINE=1): a cache
+// MISS geocodes a deterministic canned point but routing is offline, so it
+// returns the route-unavailable sentinel + nulls. Populating the cache columns
+// directly proves a cache HIT returns the cached values with error: null, and
+// that the cache is invalidated on address change.
+const MISS_ERROR = "Couldn't calculate a route for this trip."
 
 function db(): Database.Database {
   const dbPath = (process.env.DATABASE_URL ?? '').replace(/^file:/, '')
@@ -25,8 +25,20 @@ interface EstimateResponse {
   distance: string | null
   durationValue: number | null
   distanceValue: number | null
+  pickupLat: number | null
+  pickupLng: number | null
+  dropoffLat: number | null
+  dropoffLng: number | null
+  routeGeometry: number[][] | null
   error: string | null
 }
+
+// Canned OSRM-style geometry ([lon,lat][]) stored as JSON in the cache.
+const ROUTE_GEOMETRY: number[][] = [
+  [-96.7, 33.02],
+  [-96.71, 32.99],
+  [-96.73, 32.95],
+]
 
 // Track rows we mutate so each test leaves the shared DB as it found it.
 const touched: string[] = []
@@ -47,10 +59,25 @@ function populateCache(id: string): void {
     conn
       .prepare(
         `UPDATE ride SET cachedDistanceText = ?, cachedDistanceValue = ?,
-           cachedDurationText = ?, cachedDurationValue = ?, estimatedAt = ?
+           cachedDurationText = ?, cachedDurationValue = ?,
+           cachedPickupLat = ?, cachedPickupLng = ?,
+           cachedDropoffLat = ?, cachedDropoffLng = ?,
+           cachedRouteGeometry = ?, estimatedAt = ?
          WHERE id = ?`
       )
-      .run('12.3 mi', 19795, '18 mins', 1080, new Date().toISOString(), id)
+      .run(
+        '12.3 mi',
+        19795,
+        '18 mins',
+        1080,
+        33.02,
+        -96.7,
+        32.95,
+        -96.73,
+        JSON.stringify(ROUTE_GEOMETRY),
+        new Date().toISOString(),
+        id
+      )
     touched.push(id)
   } finally {
     conn.close()
@@ -63,7 +90,10 @@ function clearCache(id: string): void {
     conn
       .prepare(
         `UPDATE ride SET cachedDistanceText = NULL, cachedDistanceValue = NULL,
-           cachedDurationText = NULL, cachedDurationValue = NULL, estimatedAt = NULL
+           cachedDurationText = NULL, cachedDurationValue = NULL,
+           cachedPickupLat = NULL, cachedPickupLng = NULL,
+           cachedDropoffLat = NULL, cachedDropoffLng = NULL,
+           cachedRouteGeometry = NULL, estimatedAt = NULL
          WHERE id = ?`
       )
       .run(id)
@@ -91,6 +121,13 @@ describe('ride estimate caching (issue #14)', () => {
     expect(res.distanceValue).toBe(19795)
     expect(res.duration).toBe('18 mins')
     expect(res.durationValue).toBe(1080)
+    // Coordinates are cached + served alongside the estimate (for the map).
+    expect(res.pickupLat).toBe(33.02)
+    expect(res.pickupLng).toBe(-96.7)
+    expect(res.dropoffLat).toBe(32.95)
+    expect(res.dropoffLng).toBe(-96.73)
+    // The driving path is cached (JSON) + served for the map's route line.
+    expect(res.routeGeometry).toEqual(ROUTE_GEOMETRY)
   })
 
   it('re-misses after a PUT changes the address (cache invalidation)', async () => {
@@ -111,13 +148,15 @@ describe('ride estimate caching (issue #14)', () => {
       body: { dropoffDisplay: 'A Completely New Destination, TX' },
     })
 
-    // With the cache cleared and no server API key configured, we're back to the
-    // miss response rather than stale cached values.
+    // Cache cleared -> a miss. With routing offline we get the friendly
+    // route-unavailable sentinel + nulls rather than stale cached values.
     const miss = await $fetch<EstimateResponse>(`/api/get/rides/estimate/${id}`, {
       headers: { cookie },
     })
-    expect(miss.error).toBe('Maps API Key not configured')
+    expect(miss.error).toBe(MISS_ERROR)
     expect(miss.distance).toBe(null)
     expect(miss.durationValue).toBe(null)
+    expect(miss.pickupLat).toBe(null)
+    expect(miss.routeGeometry).toBe(null)
   })
 })
