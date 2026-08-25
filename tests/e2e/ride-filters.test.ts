@@ -1,58 +1,79 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BASE_FILTER_OPTIONS,
-  DEFAULT_EXCLUDED_FILTERS,
-  sanitizeSavedFilters,
+  ALL_RIDE_STATUSES,
+  DEFAULT_RIDE_STATUSES,
+  RIDE_STATUS_OPTIONS,
+  buildRidesInclude,
+  legacyCookieToStatuses,
+  sanitizeStatuses,
 } from '../../app/utils/rideFilters'
 
-// Pure-function unit test for the rides status-filter helpers (issue #22).
-// Intentionally does NOT call setup() — it exercises pure helpers and must not
-// boot the Nuxt app, so it stays fast (mirrors trusted-origins.test.ts).
-describe('ride filter helpers (#22)', () => {
-  const validValues = BASE_FILTER_OPTIONS.map((o) => o.value)
-
-  it('has no default excluded filter that is absent from the toggleable options', () => {
-    // Pins the bug: `status:CANCELLED` was a default exclusion but is not a
-    // toggleable filter option, leaving the UI stuck with an un-removable filter.
-    for (const f of DEFAULT_EXCLUDED_FILTERS) {
-      expect(validValues).toContain(f.value)
-    }
+// Pure-function unit test for the rides status-filter helpers. Intentionally
+// does NOT call setup() — it exercises pure helpers and must not boot the Nuxt
+// app, so it stays fast (mirrors trusted-origins.test.ts).
+describe('ride filter helpers', () => {
+  it('exposes all four real ride statuses, including CANCELLED (#5)', () => {
+    expect(ALL_RIDE_STATUSES).toEqual(['CREATED', 'ASSIGNED', 'COMPLETED', 'CANCELLED'])
+    expect(RIDE_STATUS_OPTIONS.map((o) => o.value)).toEqual(ALL_RIDE_STATUSES)
   })
 
-  it('keeps the sensible Completed default exclusion', () => {
-    expect(DEFAULT_EXCLUDED_FILTERS.map((f) => f.value)).toContain('status:COMPLETED')
+  it('defaults to active work only (hides Completed/Cancelled)', () => {
+    expect(DEFAULT_RIDE_STATUSES).toEqual(['CREATED', 'ASSIGNED'])
   })
 
-  it('keeps status:CANCELLED now that it is a real, toggleable status (#5)', () => {
-    // CANCELLED became a first-class RideStatus in #5, so it is a valid filter
-    // value and must survive sanitize (it is no longer the stuck-filter bug #22).
-    expect(validValues).toContain('status:CANCELLED')
-    const saved = [
-      { label: 'Completed', value: 'status:COMPLETED' },
-      { label: 'Cancelled', value: 'status:CANCELLED' },
-    ]
-    const result = sanitizeSavedFilters(saved, validValues)
-    expect(result.map((f) => f.value)).toEqual(['status:COMPLETED', 'status:CANCELLED'])
+  describe('sanitizeStatuses', () => {
+    it('keeps known statuses and strips unknown ones', () => {
+      expect(sanitizeStatuses(['CREATED', 'BOGUS', 'COMPLETED'])).toEqual(['CREATED', 'COMPLETED'])
+    })
+    it('handles null/undefined/non-array gracefully', () => {
+      expect(sanitizeStatuses(null)).toEqual([])
+      expect(sanitizeStatuses(undefined)).toEqual([])
+      expect(sanitizeStatuses('CREATED')).toEqual([])
+    })
   })
 
-  it('strips a genuinely stale/unknown saved filter but keeps valid ones', () => {
-    const saved = [
-      { label: 'Completed', value: 'status:COMPLETED' },
-      { label: 'Bogus', value: 'status:BOGUS' },
-    ]
-    const result = sanitizeSavedFilters(saved, validValues)
-    expect(result.map((f) => f.value)).toEqual(['status:COMPLETED'])
-    expect(result.map((f) => f.value)).not.toContain('status:BOGUS')
+  describe('buildRidesInclude', () => {
+    it('maps selected statuses to prefixed include values', () => {
+      expect(buildRidesInclude(['CREATED', 'ASSIGNED'], false)).toBe(
+        'status:CREATED,status:ASSIGNED'
+      )
+    })
+    it('appends assign:ME when assignedToMe is set', () => {
+      expect(buildRidesInclude(['CREATED'], true)).toBe('status:CREATED,assign:ME')
+    })
+    it('returns undefined for an empty selection (server treats it as all)', () => {
+      expect(buildRidesInclude([], false)).toBeUndefined()
+    })
+    it('assign:ME alone still produces a param', () => {
+      expect(buildRidesInclude([], true)).toBe('assign:ME')
+    })
+    it('drops unknown statuses before building', () => {
+      expect(buildRidesInclude(['CREATED', 'BOGUS'] as never, false)).toBe('status:CREATED')
+    })
   })
 
-  it('keeps runtime-valid values that are passed in validValues (e.g. assign:ME)', () => {
-    const saved = [{ label: 'Assigned to Me', value: 'assign:ME' }]
-    const result = sanitizeSavedFilters(saved, [...validValues, 'assign:ME'])
-    expect(result.map((f) => f.value)).toEqual(['assign:ME'])
-  })
-
-  it('handles null/undefined saved cookie gracefully', () => {
-    expect(sanitizeSavedFilters(null, validValues)).toEqual([])
-    expect(sanitizeSavedFilters(undefined, validValues)).toEqual([])
+  describe('legacyCookieToStatuses (cookie -> DB migration)', () => {
+    it('converts the default cookie state (exclude Completed+Cancelled) to active work', () => {
+      const excluded = [
+        { label: 'Completed', value: 'status:COMPLETED' },
+        { label: 'Cancelled', value: 'status:CANCELLED' },
+      ]
+      expect(legacyCookieToStatuses([], excluded)).toEqual(['CREATED', 'ASSIGNED'])
+    })
+    it('intersects an explicit include with the exclude set', () => {
+      const active = [
+        { label: 'Created', value: 'status:CREATED' },
+        { label: 'Completed', value: 'status:COMPLETED' },
+      ]
+      const excluded = [{ label: 'Completed', value: 'status:COMPLETED' }]
+      expect(legacyCookieToStatuses(active, excluded)).toEqual(['CREATED'])
+    })
+    it('with no include and no exclude, shows every status', () => {
+      expect(legacyCookieToStatuses([], [])).toEqual(ALL_RIDE_STATUSES)
+    })
+    it('tolerates plain strings and null cookies', () => {
+      expect(legacyCookieToStatuses(['status:ASSIGNED'], null)).toEqual(['ASSIGNED'])
+      expect(legacyCookieToStatuses(null, undefined)).toEqual(ALL_RIDE_STATUSES)
+    })
   })
 })

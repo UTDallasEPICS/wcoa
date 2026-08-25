@@ -1,48 +1,70 @@
-// Pure, testable logic for the Rides dashboard status filters (issue #22).
+// Pure, testable logic for the Rides list status filter.
 //
-// Background: the "Exclude Status" dropdown used to default to excluding a
-// `status:CANCELLED` filter, but CANCELLED is not a real RideStatus and is not
-// among the toggleable `filterOptions`. That left the filter active in the
-// dropdown header with no checkbox to turn it off — an un-toggleable, stuck
-// filter. These helpers keep the persisted cookie state in sync with the set of
-// filter values the UI can actually toggle.
+// The list used to carry two filters — an "include" set and an "exclude" set —
+// persisted as browser cookies. That's now a single "which statuses to show"
+// selection, persisted per-user in the DB (see /api/{get,put}/preferences) so it
+// follows the user across devices. These helpers convert that selection to the
+// rides API's `include` query param and defend against unknown stored values.
 
-export type RideFilter = { label: string; value: string }
+export type RideStatus = 'CREATED' | 'ASSIGNED' | 'COMPLETED' | 'CANCELLED'
 
-/**
- * The base status filter values that always exist in the UI. Volunteer-only
- * options (e.g. `assign:ME`) are appended at runtime in the component and are
- * treated as valid there via the `validValues` argument to sanitize.
- */
-export const BASE_FILTER_OPTIONS: RideFilter[] = [
-  { label: 'Created', value: 'status:CREATED' },
-  { label: 'Assigned', value: 'status:ASSIGNED' },
-  { label: 'Completed', value: 'status:COMPLETED' },
-  { label: 'Cancelled', value: 'status:CANCELLED' },
+// Every ride status with a display label, for the status filter toggles.
+export const RIDE_STATUS_OPTIONS: { label: string; value: RideStatus }[] = [
+  { label: 'Created', value: 'CREATED' },
+  { label: 'Assigned', value: 'ASSIGNED' },
+  { label: 'Completed', value: 'COMPLETED' },
+  { label: 'Cancelled', value: 'CANCELLED' },
 ]
 
-/**
- * Default excluded filters for new users. Excludes finished rides (Completed and
- * Cancelled) so the dashboard defaults to active work. Both are valid, toggleable
- * options in BASE_FILTER_OPTIONS, so a user can always turn the exclusion off
- * (unlike the pre-#5 stale `status:CANCELLED` default, which had no toggle — #22).
- */
-export const DEFAULT_EXCLUDED_FILTERS: RideFilter[] = [
-  { label: 'Completed', value: 'status:COMPLETED' },
-  { label: 'Cancelled', value: 'status:CANCELLED' },
-]
+export const ALL_RIDE_STATUSES: RideStatus[] = RIDE_STATUS_OPTIONS.map((o) => o.value)
+
+// Default view for a user who has never saved a preference: active work only
+// (hide Completed/Cancelled). Matches the pre-DB cookie default (issue #22).
+export const DEFAULT_RIDE_STATUSES: RideStatus[] = ['CREATED', 'ASSIGNED']
 
 /**
- * Drop any saved filter whose value is not among the currently toggleable
- * options. This frees existing users whose `ride-excluded-filters` cookie still
- * contains `status:CANCELLED` (or any other stale value) so they aren't stuck
- * with an active-but-unmanageable filter.
+ * Keep only known ride statuses. Defensive when hydrating a saved preference so
+ * a stale/renamed value can never drive the UI or reach the API.
  */
-export function sanitizeSavedFilters(
-  saved: RideFilter[] | null | undefined,
-  validValues: string[]
-): RideFilter[] {
+export function sanitizeStatuses(saved: unknown): RideStatus[] {
   if (!Array.isArray(saved)) return []
-  const valid = new Set(validValues)
-  return saved.filter((f) => f && valid.has(f.value))
+  const valid = new Set<string>(ALL_RIDE_STATUSES)
+  return saved.filter((s): s is RideStatus => typeof s === 'string' && valid.has(s))
+}
+
+/**
+ * Build the rides API `include` param from the selected statuses plus the
+ * volunteer-only "assigned to me" toggle. An empty selection returns undefined:
+ * the server treats "no include" as "all statuses", which is the intuitive
+ * meaning of clearing every status filter.
+ */
+export function buildRidesInclude(
+  statuses: RideStatus[],
+  assignedToMe: boolean
+): string | undefined {
+  const parts = sanitizeStatuses(statuses).map((s) => `status:${s}`)
+  if (assignedToMe) parts.push('assign:ME')
+  return parts.length ? parts.join(',') : undefined
+}
+
+/**
+ * One-time migration of the legacy cookie filter model (an include set and an
+ * exclude set of `status:X` values, stored as `{ label, value }[]`) into the new
+ * "shown statuses" selection. Effective shown set = (included statuses, or all
+ * statuses if none were included) minus the excluded statuses. Tolerates either
+ * the raw cookie object shape or plain strings.
+ */
+export function legacyCookieToStatuses(active: unknown, excluded: unknown): RideStatus[] {
+  const values = (raw: unknown): string[] =>
+    Array.isArray(raw)
+      ? raw
+          .map((x) => (typeof x === 'string' ? x : (x as { value?: string })?.value))
+          .filter((v): v is string => typeof v === 'string')
+      : []
+  const strip = (v: string) => (v.startsWith('status:') ? v.slice('status:'.length) : v)
+
+  const included = sanitizeStatuses(values(active).map(strip))
+  const excludedSet = new Set(sanitizeStatuses(values(excluded).map(strip)))
+  const base = included.length ? included : [...ALL_RIDE_STATUSES]
+  return base.filter((s) => !excludedSet.has(s))
 }

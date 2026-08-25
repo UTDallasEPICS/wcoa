@@ -27,11 +27,12 @@ interface EstimateResponse {
   error: string | null
 }
 
-// The test env configures no server Maps key, and no seeded ride has a cached
-// estimate, so an *authorized* call falls through to the cache-miss branch and
-// returns HTTP 200 with this sentinel (see estimate-cache.test.ts). Asserting on
-// it proves the caller cleared the scoping gate and reached the Google branch.
-const MISS_ERROR = 'Maps API Key not configured'
+// The harness runs maps offline (MAPS_OFFLINE=1) and no seeded ride has a cached
+// estimate, so an *authorized* call falls through to the cache-miss branch,
+// geocodes a canned point, fails to route (offline), and responds HTTP 200 with
+// this sentinel. Asserting on it proves the caller cleared the scoping gate and
+// reached the estimate computation (hermetically — no outbound call).
+const MISS_ERROR = "Couldn't calculate a route for this trip."
 
 async function allRides(cookie: string): Promise<Ride[]> {
   const { items } = await $fetch<{ items: Ride[] }>('/api/get/rides?pageSize=100', {

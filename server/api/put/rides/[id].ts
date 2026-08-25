@@ -110,6 +110,11 @@ export default defineEventHandler(async (event) => {
     cachedDistanceValue?: number | null
     cachedDurationText?: string | null
     cachedDurationValue?: number | null
+    cachedPickupLat?: number | null
+    cachedPickupLng?: number | null
+    cachedDropoffLat?: number | null
+    cachedDropoffLng?: number | null
+    cachedRouteGeometry?: string | null
     estimatedAt?: Date | null
   } = {}
 
@@ -131,6 +136,11 @@ export default defineEventHandler(async (event) => {
     updateData.cachedDistanceValue = null
     updateData.cachedDurationText = null
     updateData.cachedDurationValue = null
+    updateData.cachedPickupLat = null
+    updateData.cachedPickupLng = null
+    updateData.cachedDropoffLat = null
+    updateData.cachedDropoffLng = null
+    updateData.cachedRouteGeometry = null
     updateData.estimatedAt = null
   }
 

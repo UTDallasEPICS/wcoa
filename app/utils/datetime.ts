@@ -17,19 +17,47 @@
  * server/utils/datetime.ts (issue #9).
  */
 
+import { ref } from 'vue'
+
 export const APP_TIME_ZONE = 'America/Chicago'
+
+// The viewer's 12h/24h clock preference, detected on the client AFTER hydration
+// (plugins/clock.client.ts). Left undefined on the server and during the first
+// client render so SSR and hydration agree on the en-US default (12h); once set,
+// time displays reactively re-render in the user's preferred cycle. A Vue ref
+// (never mutated on the server) so it can't leak across SSR requests.
+export const clockHour12 = ref<boolean | undefined>(undefined)
+
+/**
+ * Detect whether the browser's default locale uses a 12-hour clock. Client-only
+ * (call after mount). Note: Chrome/V8 report the locale's CLDR default here and
+ * do NOT reflect macOS's "24-Hour Time" force flag for en-US — which is why an
+ * explicit user preference can override this (see plugins/clock.client.ts).
+ * Defaults to 12h (true) if the environment can't report a cycle.
+ */
+export function detectHour12(): boolean {
+  try {
+    const cycle = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions()
+      .hourCycle
+    return cycle === 'h11' || cycle === 'h12'
+  } catch {
+    return true
+  }
+}
 
 /**
  * Format an instant in the app's fixed locale + timezone. Extra
  * `Intl.DateTimeFormatOptions` are merged in so each call site keeps its own
- * date/time style; only the locale and timezone are forced.
+ * date/time style; only the locale and timezone are forced. The hour cycle
+ * follows the viewer's system preference once detected (12h by default).
  */
 export function formatDateTime(
   value: string | number | Date,
-  options: Intl.DateTimeFormatOptions = {},
+  options: Intl.DateTimeFormatOptions = {}
 ): string {
   return new Date(value).toLocaleString('en-US', {
     timeZone: APP_TIME_ZONE,
+    hour12: clockHour12.value,
     ...options,
   })
 }

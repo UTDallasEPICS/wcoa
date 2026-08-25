@@ -21,9 +21,10 @@ model User {
   deletedEmail String?
   deletedPhone String?
 
-  sessions  Session[]
-  volunteer Volunteer?
-  client    Client?
+  sessions   Session[]
+  volunteer  Volunteer?
+  client     Client?
+  preference UserPreference?
 
   @@unique([email])
   @@map("user")

@@ -113,7 +113,7 @@ is not documentation that can rot — it is enforced.
 | R-112 | Changing pickup/dropoff display invalidates the cached Maps estimate (#14) | `put/rides/[id].ts` | auto | `estimate-cache.test.ts` |
 | R-113 | Ride delete is a soft-delete: hidden from lists/byId/estimate, row + history preserved (#27) | `delete/rides/[id].ts` | auto | `soft-deletes.test.ts` |
 | R-114 | `get/rides/byId` of a missing/archived ride → 404 for every role | `get/rides/byId/[id].ts` | auto | `known-bugs.test.ts` |
-| R-115 | Estimate endpoint: serves cache when `estimatedAt` set; on miss with no server key returns a clean "not configured" payload (never the public embed key — #30) | `estimate/[id].ts` | auto | `estimate-cache.test.ts`, `maps-key-split.test.ts` |
+| R-115 | Estimate serves the cache when `estimatedAt` is set; on a miss it geocodes (Nominatim) + routes (OSRM) — open-source, no API key — caching distance/duration + coordinates + the driving-path geometry, and returns a clean error payload when the services are unavailable | `estimate/[id].ts` + `server/utils/maps.ts` | auto | `estimate-cache.test.ts`, `rides-estimate-scoping.test.ts` |
 
 ## 7. Rides — volunteer self-service (signup / unsignup / complete)
 
@@ -200,11 +200,11 @@ is not documentation that can rot — it is enforced.
 | R-291 | Nav is role-dependent: admin sees Dashboard/Rides/People/Notifications/Audit; volunteer sees Rides only (+ Settings/Logout in the user menu) | `app/app.vue` | auto | browser: `volunteer-flows.spec.ts`, `admin-flows.spec.ts` |
 | R-292 | Dashboard renders the three metric cards with per-card date-range pickers | `app/pages/index.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-293 | Rides list: server-driven search/sort/status-filters/date-range/pagination; default view excludes COMPLETED+CANCELLED | `app/pages/rides/index.vue` | auto | browser: `admin-flows.spec.ts` + `ride-filters.test.ts` |
-| R-294 | Create Ride modal: client dropdown fed by the bounded `/options` endpoint; selecting a client auto-fills pickup with their home address; address typeahead searches existing addresses (#19) | rides/index.vue | auto | browser: `admin-flows.spec.ts` |
+| R-294 | Create Ride is a 3-step wizard (Client & route → Schedule → Review) shown as a side pane on desktop / full-screen on mobile; client dropdown fed by the bounded `/options` endpoint; selecting a client auto-fills pickup with their home address; the address field searches existing saved addresses (surfacing duplicates/close matches to reuse) with a manual-entry fallback; blocks same pickup/dropoff and a pickup time after the appointment | `RideCreatePanel.vue` + `AddressField.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-295 | Modal state fully resets when closed/reopened (#11) | rides/index.vue | auto | `ride-form-reset.test.ts` |
 | R-296 | Ride detail: status badge, Edit/Cancel/Delete (admin); Cancel goes through a confirm modal, shows a toast, hides the button once CANCELLED | `app/pages/rides/[id].vue` | auto | browser: `admin-flows.spec.ts` |
 | R-297 | Ride detail "Navigate" is a Google-Maps deep link (`maps/dir/?api=1`) with URL-encoded origin/destination (#26) | `app/utils/mapsLink.ts` | auto | `ride-navigate-link.test.ts` |
-| R-298 | Map embed uses ONLY the public embed key; with no key it degrades to a friendly placeholder, never an error page (#30) | rides/[id].vue | auto | `maps-key-split.test.ts` + browser: `admin-flows.spec.ts` |
+| R-298 | Ride-detail route map uses MapLibre + OpenFreeMap tiles (no API key); plots pickup/dropoff markers and draws the driving route line (straight-line fallback when no geometry); degrades to a friendly placeholder when coordinates are unavailable, never an error page | `RideRouteMap.vue` + rides/[id].vue | auto | browser: `admin-flows.spec.ts` |
 | R-299 | Volunteer ride detail: Sign Up on CREATED rides; Unsign Up + Mark-as-Completed (duration modal) on own ASSIGNED rides | rides/[id].vue | auto | browser: `volunteer-flows.spec.ts` (completion pinned by [#87](https://github.com/UTDallasEPICS/wcoa/issues/87)) |
 | R-300 | People page: Volunteers/Clients/Admins tabs, search, role filter; edit modal prefills ALL fields and sends a full payload with phone normalized to digits | `app/pages/people.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-301 | Settings (volunteer): profile card, status selector, per-type notification toggles, reminder editor — all persisted via bySession endpoints | `app/pages/settings.vue` | auto | browser: `volunteer-flows.spec.ts` |
@@ -212,6 +212,7 @@ is not documentation that can rot — it is enforced.
 | R-303 | Admin audit page: bounded table, action/user filters | `app/pages/admin/audit.vue` | auto | browser: `admin-flows.spec.ts` |
 | R-304 | Pages hydrate without mismatches (SSR output == client render): SSR-rendered dates are timezone-stable so server (UTC) and browser (local TZ) agree | `app/utils/datetime.ts`, rides/index.vue, rides/[id].vue, admin/audit.vue | auto [#98](https://github.com/UTDallasEPICS/wcoa/issues/98) | `hydration-datetime.test.ts` (server-side determinism) + browser: `admin-flows.spec.ts` (`/rides` hydrates clean) |
 | R-305 | Success/error toasts on every mutating UI action | all pages | auto | browser specs (asserted on key flows) |
+| R-306 | Rides list preferences (status filter, sort, rows-per-page, table/cards view per breakpoint, and clock format auto/12h/24h) persist per-user in the DB — cross-device — via `GET`/`PUT /api/*/preferences`; validated + session-scoped; the list seeds from and debounce-saves them. The clock-format override exists because Chrome/V8 ignore macOS's force-24h flag for en-US | `UserPreference` model + `get/put preferences.ts` | auto | `preferences.test.ts` |
 
 ## Known non-requirements / accepted behavior
 

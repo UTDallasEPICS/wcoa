@@ -2,7 +2,10 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   modules: ['@nuxt/ui', 'nuxt-cron'],
-  css: ['./assets/css/main.css'],
+  // maplibre-gl.css is loaded globally (not from the component) so it's reliably
+  // bundled — without it the map canvas renders blank. It only styles
+  // `.maplibregl-*`, so it can't affect non-map pages.
+  css: ['./assets/css/main.css', 'maplibre-gl/dist/maplibre-gl.css'],
   // Dev file-watcher: never descend into `.claude/`. Claude Code stores its
   // agent git worktrees under `.claude/worktrees/` — full nested checkouts that
   // overwhelm the FSEvents/fs.watch watcher and crash `nuxt dev` with
@@ -16,29 +19,17 @@ export default defineNuxtConfig({
       },
     },
   },
-  runtimeConfig: {
-    // Server-only (issue #30): the Directions API key used by the estimate
-    // endpoint. It NEVER reaches the client bundle. Overridden by the
-    // NUXT_GOOGLE_MAPS_API_KEY env var. This MUST be a DIFFERENT Google Cloud
-    // key from the public embed key below — a private, IP/API-restricted
-    // Directions key.
-    googleMapsApiKey: '', // Overridden by NUXT_GOOGLE_MAPS_API_KEY
-    public: {
-      // Client-visible (issue #30): the Maps *embed* iframe key. This ships to
-      // the browser by design, so it MUST be HTTP-referrer-restricted in Google
-      // Cloud and scoped to the Maps Embed API only. Overridden by
-      // NUXT_PUBLIC_GOOGLE_MAPS_API_KEY.
-      googleMapsApiKey: '', // Overridden by NUXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    },
-  },
+  // Maps/geocoding/routing use key-less open-source services (MapLibre +
+  // OpenFreeMap tiles, Nominatim geocoding, OSRM routing), so no map API keys /
+  // runtimeConfig are needed. The former Google Directions + Embed keys are gone.
   nitro: {
     externals: {
-      external: ['better-sqlite3']
+      external: ['better-sqlite3'],
     },
     // Same rationale as `vite.server.watch.ignored` above: keep Nitro's dev
     // watcher out of `.claude/` so nested agent worktrees can't exhaust it.
     watchOptions: {
-      ignored: ['**/.claude/**']
-    }
-  }
+      ignored: ['**/.claude/**'],
+    },
+  },
 })
