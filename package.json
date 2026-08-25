@@ -43,11 +43,5 @@
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "vitest": "^4.1.9"
-  },
-  "pnpm": {
-    "overrides": {
-      "srvx@0.11.21": "0.11.20"
-    }
-  },
-  "packageManager": "pnpm@10.28.1"
+  }
 }
